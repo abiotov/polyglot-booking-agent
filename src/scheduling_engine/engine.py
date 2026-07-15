@@ -15,8 +15,8 @@ and are offered last, in chronological order.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, datetime, timedelta
-from typing import Sequence
 
 from .models import (
     WEEKDAY_NAMES,

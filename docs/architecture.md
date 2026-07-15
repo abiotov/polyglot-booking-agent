@@ -151,10 +151,33 @@ not just synthetic tests:
 - Persistent HTTP clients everywhere: TLS setup per clip cost seconds
   on a slow uplink (measured 3.0s down to 0.4s).
 
+**Realtime (`src/channels/livekit_agent.py`) - built (phase 3).**
+LiveKit Agents provides the realtime body (mic, VAD, streaming STT,
+barge-in, TTS playback); the conversation brain stays the project's
+BookingAgent, plugged in by overriding `Agent.llm_node`. LiveKit never
+sees the tools or the calendar. Console mode runs fully local
+(`python -m channels.livekit_agent console`).
+
+Realtime specifics, each earned from a live session:
+
+- **Session-level LLM placeholder**: livekit-agents silently skips
+  reply generation when the session has no llm set, even with llm_node
+  overridden; a never-invoked plugin instance satisfies that gate.
+- **Spoken filler**: the brain streams progress events
+  (`run_turn_events`), and the channel says "un instant, je consulte le
+  planning" the moment a calendar tool round starts. Measured dead air
+  went from 5-13s to ~1.5s; end-to-end turn latency from 5.5-14.7s to
+  2.1-4.8s after this plus endpointing tuning (0.6s min) and a wired
+  microphone (a Bluetooth headset alone added ~12s of STT delay).
+- **Turn language from text**: speech.langdetect on the transcript
+  (marker words + diacritics, ambiguous turns keep the previous
+  language), driving both the [lang=xx] tag and the Cartesia voice via
+  update_options. Non-Latin hallucinated transcripts are refused with
+  a "could you repeat" instead of reaching the brain.
+- Session diagnostics mirror to logs/realtime-session.log.
+
 **Planned:**
 
-- **LiveKit / WebRTC** (phase 3): streaming pipeline with barge-in
-  (interruption) support; the browser is the everyday test surface.
 - **Vapi / PSTN** (phase 4): a free US number wired to the same brain;
   Vapi acts as telephony transport only.
 

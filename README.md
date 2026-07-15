@@ -152,7 +152,7 @@ uv run python scripts/demo_conversation.py        # replay a full booking,
   - [x] CalDAV adapter: read-before-write, agent-owned events, live-Radicale integration tests
   - [x] Text-mode agent: strict tools, OpenAI/Gemini adapters, FR/EN with mid-call switching
 - [x] **Phase 2: Telegram.** Mixed text and voice in one conversation, voice notes in and out (Deepgram nova-3 multilingual + Cartesia sonic-3, one voice across languages), per-chat sessions, find/cancel/reschedule by phone number, all hardened against real sessions (see [docs/design-decisions.md](docs/design-decisions.md))
-- [ ] **Phase 3: realtime.** LiveKit pipeline (Deepgram, LLM, Cartesia), browser demo, barge-in, live language switching
+- [x] **Phase 3: realtime.** LiveKit pipeline (same brain via `llm_node`), local console voice mode, barge-in, live language switching, spoken filler during tool rounds; full voice booking with digit-by-digit phone correction validated live (2.1-4.8s per turn)
 - [ ] **Phase 4: phone.** Free Vapi number wired to the same brain, end-to-end call demo
 - [ ] **Phase 5: proof.** Agent-vs-agent eval harness (simulated patients + structured judge), per-language success metrics in CI, slot-scoring visualizer
 

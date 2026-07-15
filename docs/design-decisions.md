@@ -115,6 +115,16 @@ becomes a code-level guard, never just a prompt tweak.
 | A French clip transcribed in Mandarin | Non-Latin transcripts rejected and retried with forced language |
 | httpx.ReadTimeout silently ate a turn | Widened Telegram timeouts + always-reply error handler |
 
+Realtime (console) sessions added their own rows:
+
+| Observed live | Shipped guard |
+| --- | --- |
+| Turns transcribed but never answered | Session-level LLM placeholder (livekit skips generation when llm is None, even with llm_node overridden) |
+| 12.7s transcript delay | Bluetooth headset mic identified; wired mic brought it to ~0.5s |
+| 5-13s of dead air during tool rounds | Event-driven brain turns + spoken filler ("un instant, je consulte le planning") |
+| A French turn transcribed in Japanese reached the brain | mostly_latin guard shared across channels; realtime asks to repeat |
+| Garbled identity ("Bon nom complique ben jao") booked | Spell-out names, digit-by-digit phones, mandatory read-back; the digit correction loop worked in the very next session |
+
 **Why it matters.** Synthetic audio (TTS-generated test clips) passes
 where real phone microphones fail. The lab round trip validated the
 pipeline; only production sessions surfaced these seven failures. The
@@ -122,7 +132,24 @@ eval harness (phase 5) will automate part of this, but the principle
 stands: judge the system on its logs and its persisted state, not on
 its replies.
 
-## 9. Frozen models, strict typing, property-based tests
+## 9. The realtime channel borrows LiveKit's body, never its brain
+
+**Decision.** The LiveKit channel overrides `Agent.llm_node` so the
+project's BookingAgent produces every reply; LiveKit supplies mic, VAD,
+streaming STT, barge-in and TTS playback only.
+
+**Alternative considered.** Use LiveKit's own agent loop with its LLM
+plugin and re-register the booking tools as LiveKit function tools.
+
+**Why.** That would mean two brains: two tool registries, two prompt
+sets, two behaviors to test and to drift apart. With the override there
+is one brain shared by CLI, Telegram and realtime, and everything the
+test suite proves about it holds on every channel. The accepted cost is
+that the reply reaches TTS as one chunk instead of streaming token by
+token (about a second of latency), compensated by the spoken filler
+during tool rounds.
+
+## 10. Frozen models, strict typing, property-based tests
 
 **Decision.** All domain models are immutable pydantic models; mypy runs
 strict; invariants are tested with Hypothesis, not only examples.

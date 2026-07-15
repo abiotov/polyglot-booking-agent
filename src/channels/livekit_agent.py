@@ -41,7 +41,7 @@ from agent import BookingAgent, BookingToolbox, build_system_prompt
 from agent.providers import get_provider
 from calendar_adapter import CalDAVCalendar
 from scheduling_engine import load_config
-from speech.langdetect import detect_language
+from speech.langdetect import detect_language, mostly_latin
 
 logger = logging.getLogger("channels.livekit")
 
@@ -83,6 +83,17 @@ class RealtimeReceptionist(Agent):
         user_text = _last_user_text(chat_ctx)
         if not user_text.strip():
             yield GREETING
+            return
+        if not mostly_latin(user_text):
+            # Streaming STT hallucinated a non-Latin language on a noisy
+            # turn (observed live: Japanese); asking to repeat beats
+            # sending garbage to the brain.
+            logger.info("non-latin transcript skipped: %r", user_text[:40])
+            yield (
+                "Pardon, je n'ai pas bien entendu, pouvez-vous répéter ?"
+                if self._last_language == "fr"
+                else "Sorry, I did not catch that, could you repeat?"
+            )
             return
 
         language = detect_language(

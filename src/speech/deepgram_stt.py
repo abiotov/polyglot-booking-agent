@@ -29,6 +29,7 @@ from typing import Any
 
 import httpx
 
+from .langdetect import mostly_latin
 from .types import Utterance
 
 logger = logging.getLogger("speech.deepgram")
@@ -36,19 +37,6 @@ logger = logging.getLogger("speech.deepgram")
 _ENDPOINT = "https://api.deepgram.com/v1/listen"
 
 Params = list[tuple[str, str | int | float | bool | None]]
-
-
-def _mostly_latin(text: str) -> bool:
-    """True if at least half of the letters are Latin-script.
-
-    Latin covers ASCII plus the accented ranges used by French
-    (Latin-1 Supplement, Latin Extended-A/B end at U+024F).
-    """
-    letters = [ch for ch in text if ch.isalpha()]
-    if not letters:
-        return True  # nothing to judge; emptiness is handled separately
-    latin = sum(1 for ch in letters if ord(ch) <= 0x024F)
-    return latin / len(letters) >= 0.5
 
 
 class DeepgramSTT:
@@ -74,7 +62,7 @@ class DeepgramSTT:
 
     def transcribe(self, audio: bytes, mime_type: str) -> Utterance:
         text, language = self._multilingual_request(audio, mime_type)
-        if not text.strip() or not _mostly_latin(text):
+        if not text.strip() or not mostly_latin(text):
             # Multi mode covers ~10 languages and can hallucinate one on a
             # noisy short clip (a live session was transcribed in Mandarin).
             # The practice's languages are Latin-script, so a mostly

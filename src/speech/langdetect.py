@@ -45,6 +45,23 @@ _FRENCH_DIACRITICS = re.compile(r"[àâäçéèêëîïôöùûüÿœ]")
 _WORD = re.compile(r"[a-zA-Zàâäçéèêëîïôöùûüÿœ'-]+")
 
 
+def mostly_latin(text: str) -> bool:
+    """True if at least half of the letters are Latin-script.
+
+    Multilingual STT can hallucinate one of its languages on noisy
+    clips (live sessions produced Mandarin and Japanese from French
+    speech). When the practice's languages are Latin-script, a mostly
+    non-Latin transcript is a recognition failure, not a caller
+    speaking Chinese. Latin covers ASCII plus the accented ranges used
+    by French (up to U+024F).
+    """
+    letters = [ch for ch in text if ch.isalpha()]
+    if not letters:
+        return True  # nothing to judge; emptiness is handled separately
+    latin = sum(1 for ch in letters if ord(ch) <= 0x024F)
+    return latin / len(letters) >= 0.5
+
+
 def detect_language(
     text: str,
     languages: Sequence[str] = ("fr", "en"),

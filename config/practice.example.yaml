@@ -31,11 +31,9 @@ client_types:
 
 visit_types:
   first_visit:
-    label_fr: "Première visite"
-    label_en: "First visit"
+    labels: { fr: "Première visite", en: "First visit" }
   follow_up:
-    label_fr: "Suivi"
-    label_en: "Follow-up"
+    labels: { fr: "Suivi", en: "Follow-up" }
 
 # Compaction scoring. A free slot earns points for each occupied
 # neighbor; isolated slots score 0 and are offered last.

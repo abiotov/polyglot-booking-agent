@@ -117,7 +117,7 @@ The loop is bounded (max tool rounds, fail-safe reply) and exposed
 through an interactive CLI (`python -m agent.cli`) and a replayable
 demo (`scripts/demo_conversation.py`).
 
-### Language switching - built (text), voice in phases 2 and 3
+### Language switching - built (text and Telegram voice)
 
 The channel tags each utterance with its detected language (Deepgram
 provides this per utterance in voice channels); the loop prepends an
@@ -127,10 +127,32 @@ both providers ignoring a mid-call switch until the tag was added. The
 orchestrator will select the TTS voice from the same tag. Adding a
 language is configuration plus one prompt translation, not code.
 
-### Channels (`channels/`) - planned, phases 2 to 4
+### Channels
 
-- **Telegram** (phase 2): voice notes in, transcription, voice notes out.
-  Turn-based, no latency constraint.
+**Telegram (`src/channels/`) - built (phase 2).** Text and voice mix
+freely in one conversation; modality is mirrored (text in, text out;
+voice in, voice note out with the transcript as caption). One isolated
+agent session per chat. The channel logic is SDK-free and fully tested
+with fake speech providers; the python-telegram-bot glue adds chat
+actions (typing / recording indicators), widened network timeouts for
+slow uplinks, and an error handler that always tells the caller to
+resend rather than failing silently.
+
+The speech layer (`src/speech/`) was hardened by real phone sessions,
+not just synthetic tests:
+
+- Deepgram nova-3 in multilingual mode transcribes FR and EN well and
+  tags each word's language; the utterance language is the dominant
+  word language among the practice's declared languages.
+- Two recovery layers catch recognition failures observed live: empty
+  transcripts and hallucinated non-Latin scripts (a noisy French clip
+  once came back in Mandarin) are retried with the fallback language
+  forced.
+- Persistent HTTP clients everywhere: TLS setup per clip cost seconds
+  on a slow uplink (measured 3.0s down to 0.4s).
+
+**Planned:**
+
 - **LiveKit / WebRTC** (phase 3): streaming pipeline with barge-in
   (interruption) support; the browser is the everyday test surface.
 - **Vapi / PSTN** (phase 4): a free US number wired to the same brain;

@@ -97,7 +97,32 @@ layer fixed it immediately. Same philosophy as the scheduling boundary:
 whenever a behavior must be reliable, move it from the prompt into the
 harness. The TTS voice will be selected from the same tag.
 
-## 8. Frozen models, strict typing, property-based tests
+## 8. Real sessions are the test suite the lab cannot write
+
+**Decision.** Every live session on the Telegram channel is analyzed
+from its operational logs and the raw calendar state; each failure
+becomes a code-level guard, never just a prompt tweak.
+
+**What the first real sessions taught, and what each lesson became:**
+
+| Observed live | Shipped guard |
+| --- | --- |
+| Appointment saved with an empty patient name | book() validates identity content, not just schema presence |
+| Duplicate bookings piling up, caller unable to see or cancel them | find_bookings(phone) tool closes the check/cancel/move loop |
+| 11s STT latency per clip | Persistent HTTP clients (measured 3.0s to 0.4s) |
+| Short clips lost or detected as German | Detection restricted to the practice's languages |
+| "Ce serait le mardi" heard as "Se croire le mardi" | nova-3 multilingual mode, dominant word language |
+| A French clip transcribed in Mandarin | Non-Latin transcripts rejected and retried with forced language |
+| httpx.ReadTimeout silently ate a turn | Widened Telegram timeouts + always-reply error handler |
+
+**Why it matters.** Synthetic audio (TTS-generated test clips) passes
+where real phone microphones fail. The lab round trip validated the
+pipeline; only production sessions surfaced these seven failures. The
+eval harness (phase 5) will automate part of this, but the principle
+stands: judge the system on its logs and its persisted state, not on
+its replies.
+
+## 9. Frozen models, strict typing, property-based tests
 
 **Decision.** All domain models are immutable pydantic models; mypy runs
 strict; invariants are tested with Hypothesis, not only examples.

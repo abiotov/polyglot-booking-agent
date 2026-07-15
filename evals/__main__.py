@@ -19,6 +19,7 @@ from observability import flush
 from scheduling_engine import load_config
 
 from .checks import run_checks
+from .judge import judge_conversation
 from .runner import run_scenario
 from .schema import load_scenarios
 
@@ -29,6 +30,7 @@ def main() -> None:
     parser.add_argument("--provider", default="openai", choices=["openai", "gemini"])
     parser.add_argument("--persona-provider", default="gemini", choices=["openai", "gemini"])
     parser.add_argument("--only", default=None, help="run a single scenario id")
+    parser.add_argument("--no-judge", action="store_true", help="skip the LLM judge")
     parser.add_argument("--config", default="config/practice.example.yaml")
     parser.add_argument("--scenarios", default="evals/scenarios")
     args = parser.parse_args()
@@ -68,6 +70,20 @@ def main() -> None:
                 mark = "PASS" if check.passed else "FAIL"
                 detail = f"  ({check.detail})" if check.detail else ""
                 print(f"  [{mark}] {check.name}{detail}")
+
+            if not args.no_judge:
+                verdict = judge_conversation(scenario, result, persona_provider)
+                if verdict is None:
+                    print("  [JUDGE] unavailable (invalid output twice)")
+                else:
+                    print(
+                        "  [JUDGE] identity_confirmed="
+                        f"{verdict.identity_confirmed_before_booking} "
+                        f"professional={verdict.professional} "
+                        f"no_broken_promises={verdict.no_broken_promises}"
+                    )
+                    for issue in verdict.issues:
+                        print(f"  [JUDGE] issue: {issue}")
             print(f"  ==> {'PASS' if scenario_passed else 'FAIL'}")
     finally:
         flush()

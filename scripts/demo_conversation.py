@@ -46,8 +46,9 @@ def main() -> None:
 
     today = date.today()
     monday = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
+    monday_label = monday.strftime("%d/%m/%Y")
     turns = [
-        (f"Bonjour, je voudrais un rendez-vous le lundi {monday.strftime('%d/%m/%Y')} au matin.", "fr"),
+        (f"Bonjour, je voudrais un rendez-vous le lundi {monday_label} au matin.", "fr"),
         ("Je suis client premium et c'est une premiere visite.", "fr"),
         ("The first one works for me. My name is Jean Kokou, phone +229 97 00 00 01.", "en"),
         ("Yes, that's correct, please book it.", "en"),

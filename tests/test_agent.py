@@ -177,7 +177,7 @@ def test_taken_slot_error_tells_the_model_to_rerank(
     result = json.loads(
         toolbox.dispatch(
             "book",
-            {"slot_id": slot_id, "patient_name": "Y", "patient_phone": "+22990000001"},
+            {"slot_id": slot_id, "patient_name": "Yao Test", "patient_phone": "+22990000001"},
         )
     )
     assert "error" in result and "get_ranked_slots" in result["error"]

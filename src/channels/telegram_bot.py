@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import logging
 import os
 from collections.abc import Awaitable
@@ -167,8 +168,24 @@ def main() -> None:
         logging.getLogger("channels.telegram").exception(
             "unhandled error while processing an update", exc_info=error
         )
+        # Never fail silently: a caller who gets no reply retries blind.
+        if isinstance(update, Update) and update.effective_message is not None:
+            with contextlib.suppress(Exception):  # best effort only
+                await update.effective_message.reply_text(
+                    "Petit souci technique, pouvez-vous renvoyer votre message ? / "
+                    "Small technical hiccup, could you resend your message?"
+                )
 
-    application = Application.builder().token(_require("TELEGRAM_BOT_TOKEN")).build()
+    application = (
+        Application.builder()
+        .token(_require("TELEGRAM_BOT_TOKEN"))
+        # Defaults (5s) time out on slow uplinks when moving voice notes.
+        .connect_timeout(20)
+        .read_timeout(30)
+        .write_timeout(30)
+        .media_write_timeout(120)
+        .build()
+    )
     application.add_handler(CommandHandler("start", on_start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     application.add_handler(MessageHandler(filters.VOICE, on_voice))

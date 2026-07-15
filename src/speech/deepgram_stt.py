@@ -2,22 +2,30 @@
 
 Uses the plain REST API over a persistent HTTP client (voice notes come
 in bursts; paying TLS setup per clip was measured at several seconds on
-a slow uplink). Language detection is requested per utterance; the
-detected language feeds the agent's [lang=xx] tag, which drives both
-the reply language and the TTS voice.
+a slow uplink).
 
-Short clips defeat unrestricted language detection: live tests saw
-"Premium, premiere visite" detected as German and truncated. Detection
-is therefore restricted to the practice's declared languages (the
-`languages` parameter), which fixed it. As a last resort, an empty
-transcript is retried once with the fallback language forced, which
-trades detection for recognition instead of losing the message.
+Language handling evolved through live sessions, in three steps:
+1. nova-2 with unrestricted detect_language lost short clips entirely
+   ("Premium, premiere visite" detected as German, empty transcripts).
+2. Restricting detection to the practice's languages fixed short clips
+   but nova-2's French stayed mediocre on real phone audio ("Ce serait
+   le mardi" heard as "Se croire le mardi").
+3. nova-3 with language=multi transcribes both well AND tags every word
+   with its language, so the utterance language is computed here as the
+   dominant word language. That tag feeds the agent's [lang=xx] tag and
+   the TTS voice.
+
+As a last resort, an empty transcript is retried once with the fallback
+language forced, which trades detection for recognition instead of
+losing the message.
 """
 
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from collections.abc import Sequence
+from typing import Any
 
 import httpx
 
@@ -27,17 +35,20 @@ logger = logging.getLogger("speech.deepgram")
 
 _ENDPOINT = "https://api.deepgram.com/v1/listen"
 
+Params = list[tuple[str, str | int | float | bool | None]]
+
 
 class DeepgramSTT:
     def __init__(
         self,
         api_key: str,
-        model: str = "nova-2",
+        model: str = "nova-3",
         languages: Sequence[str] = ("fr", "en"),
         fallback_language: str | None = None,
         timeout: float = 30.0,
     ) -> None:
-        """`languages` are the detection candidates (the practice's languages)."""
+        """`languages` are the practice's languages; the dominant word
+        language is only ever chosen among them."""
         if not languages:
             raise ValueError("languages must not be empty")
         self._model = model
@@ -49,26 +60,43 @@ class DeepgramSTT:
         )
 
     def transcribe(self, audio: bytes, mime_type: str) -> Utterance:
-        text, language = self._request(audio, mime_type, detect=True)
+        text, language = self._multilingual_request(audio, mime_type)
         if not text.strip():
             logger.info(
-                "empty transcript with detection (%d KB); retrying with lang=%s forced",
+                "empty transcript in multi mode (%d KB); retrying with lang=%s forced",
                 len(audio) // 1024,
                 self._fallback_language,
             )
-            text, language = self._request(audio, mime_type, detect=False)
+            text, language = self._forced_request(audio, mime_type)
         return Utterance(text=text, language=language)
 
-    def _request(self, audio: bytes, mime_type: str, detect: bool) -> tuple[str, str]:
-        params: list[tuple[str, str | int | float | bool | None]] = [
+    def _multilingual_request(self, audio: bytes, mime_type: str) -> tuple[str, str]:
+        params: Params = [
             ("model", self._model),
             ("smart_format", "true"),
+            ("language", "multi"),
         ]
-        if detect:
-            # Restrict detection to the practice's languages.
-            params.extend(("detect_language", lang) for lang in self._languages)
-        else:
-            params.append(("language", self._fallback_language))
+        alternative = self._post(params, audio, mime_type)
+        transcript = str(alternative.get("transcript", ""))
+        word_languages = [
+            str(word["language"]).split("-")[0]
+            for word in alternative.get("words", [])
+            if word.get("language")
+        ]
+        counts = Counter(lang for lang in word_languages if lang in self._languages)
+        dominant = counts.most_common(1)[0][0] if counts else self._fallback_language
+        return transcript, dominant
+
+    def _forced_request(self, audio: bytes, mime_type: str) -> tuple[str, str]:
+        params: Params = [
+            ("model", self._model),
+            ("smart_format", "true"),
+            ("language", self._fallback_language),
+        ]
+        alternative = self._post(params, audio, mime_type)
+        return str(alternative.get("transcript", "")), self._fallback_language
+
+    def _post(self, params: Params, audio: bytes, mime_type: str) -> dict[str, Any]:
         response = self._client.post(
             _ENDPOINT,
             params=params,
@@ -76,8 +104,7 @@ class DeepgramSTT:
             content=audio,
         )
         response.raise_for_status()
-        channel = response.json()["results"]["channels"][0]
-        transcript = str(channel["alternatives"][0]["transcript"])
-        language = str(channel.get("detected_language") or self._fallback_language)
-        # Deepgram may return regional codes ("en-US"); keep the base tag.
-        return transcript, language.split("-")[0]
+        alternative: dict[str, Any] = response.json()["results"]["channels"][0][
+            "alternatives"
+        ][0]
+        return alternative

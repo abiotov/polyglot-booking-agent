@@ -79,7 +79,25 @@ practice timezone; the calendar adapter owns all timezone conversion.
 Pushing timezone handling to the I/O boundary keeps the pure core simple
 and keeps DST bugs in one auditable place.
 
-## 7. Frozen models, strict typing, property-based tests
+## 7. Language switching is tagged by the channel, not guessed by the model
+
+**Decision.** Each caller utterance carries a `[lang=xx]` tag injected
+by the harness (from the STT's per-utterance language detection in
+voice channels). The system prompt declares the tag authoritative for
+the reply language.
+
+**Alternative considered.** Instruct the model to detect and follow the
+caller's language by itself.
+
+**Why.** Live tests were unambiguous: with prompt instructions alone,
+both gpt-4o-mini and gemini-2.5-flash kept answering in French after
+the caller switched to English, because the conversation history
+outweighed the instruction. A deterministic tag from the transcription
+layer fixed it immediately. Same philosophy as the scheduling boundary:
+whenever a behavior must be reliable, move it from the prompt into the
+harness. The TTS voice will be selected from the same tag.
+
+## 8. Frozen models, strict typing, property-based tests
 
 **Decision.** All domain models are immutable pydantic models; mypy runs
 strict; invariants are tested with Hypothesis, not only examples.

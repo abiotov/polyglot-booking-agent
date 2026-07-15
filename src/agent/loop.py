@@ -31,12 +31,25 @@ class BookingAgent:
         self._max_tool_rounds = max_tool_rounds
         self.history: list[ChatMessage] = []
 
-    def run_turn(self, user_text: str, today: date | None = None) -> str:
-        """Process one caller message and return the agent's reply."""
+    def run_turn(
+        self,
+        user_text: str,
+        today: date | None = None,
+        language: str | None = None,
+    ) -> str:
+        """Process one caller message and return the agent's reply.
+
+        `language` is the utterance language detected by the channel
+        (Deepgram tags every utterance in voice channels). When present
+        it is prepended as a [lang=xx] tag that the system prompt
+        declares authoritative, which makes mid-call language switching
+        deterministic instead of hoping the model notices.
+        """
         system = self._system_prompt.replace(
             "{today}", (today or date.today()).isoformat()
         )
-        self.history.append(ChatMessage(role="user", content=user_text))
+        content = f"[lang={language}] {user_text}" if language else user_text
+        self.history.append(ChatMessage(role="user", content=content))
 
         for _ in range(self._max_tool_rounds):
             reply = self._provider.complete(system, self.history, self._toolbox.specs())

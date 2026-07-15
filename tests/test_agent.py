@@ -193,6 +193,17 @@ def test_unknown_qualification_values_are_rejected(
     assert "error" in result
 
 
+def test_language_tag_from_the_channel_is_prepended(
+    calendar: CalDAVCalendar, config: PracticeConfig
+) -> None:
+    """Voice channels tag each utterance with its detected language."""
+    toolbox = BookingToolbox(calendar, config)
+    provider = ScriptedProvider([ProviderReply(text="ok")])
+    agent = BookingAgent(provider, toolbox, build_system_prompt(config))
+    agent.run_turn("The first one works.", today=MONDAY, language="en")
+    assert agent.history[0].content == "[lang=en] The first one works."
+
+
 def test_runaway_tool_loop_fails_safe(
     calendar: CalDAVCalendar, config: PracticeConfig
 ) -> None:

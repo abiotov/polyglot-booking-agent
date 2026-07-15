@@ -91,8 +91,8 @@ Every provider sits behind a small interface. Swapping means changing an environ
 ```text
 ├── src/
 │   ├── scheduling_engine/   # pure domain logic: constraints, scoring, config
-│   └── calendar_adapter/    # CalDAV I/O, read-before-write, dev server
-├── agent/                   # LLM loop, typed tools, prompts    (phase 1)
+│   ├── calendar_adapter/    # CalDAV I/O, read-before-write, dev server
+│   └── agent/               # LLM loop, strict tools, providers, prompts, CLI
 ├── channels/                # telegram, livekit, vapi           (phases 2-4)
 ├── evals/                   # simulated patients + LLM judge    (phase 5)
 ├── scripts/                 # run_radicale.py, seed_calendar.py
@@ -135,13 +135,22 @@ PY
 Point Thunderbird or DAVx5 at `http://127.0.0.1:5232` to edit the same
 calendar by hand and watch the ranking react.
 
+Talk to the agent (needs `OPENAI_API_KEY` or `GEMINI_API_KEY` in `.env`,
+see `.env.example`):
+
+```bash
+uv run python -m agent.cli --provider openai      # interactive chat
+uv run python scripts/demo_conversation.py        # replay a full booking,
+                                                  # French to English mid-call
+```
+
 ## Roadmap
 
 - [x] Repository bootstrap, CI, docs
-- [ ] **Phase 1: the brain.**
+- [x] **Phase 1: the brain.**
   - [x] Scheduling engine: constraints + compaction scoring, unit and property-based tests
   - [x] CalDAV adapter: read-before-write, agent-owned events, live-Radicale integration tests
-  - [ ] Text-mode agent with strict tools, FR/EN
+  - [x] Text-mode agent: strict tools, OpenAI/Gemini adapters, FR/EN with mid-call switching
 - [ ] **Phase 2: Telegram.** Voice notes in and out, first language switching
 - [ ] **Phase 3: realtime.** LiveKit pipeline (Deepgram, LLM, Cartesia), browser demo, barge-in, live language switching
 - [ ] **Phase 4: phone.** Free Vapi number wired to the same brain, end-to-end call demo

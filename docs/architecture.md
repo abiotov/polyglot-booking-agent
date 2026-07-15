@@ -89,7 +89,7 @@ and tests (it also works around a Radicale startup probe that crashes on
 Windows without Developer Mode). `scripts/run_radicale.py` starts it;
 `scripts/seed_calendar.py` fills a realistic demo week.
 
-### Conversational agent (`agent/`) - planned, phase 1
+### Conversational agent (`src/agent/`) - built (text mode)
 
 An LLM tool-calling loop. The tools are the only bridge to the engine:
 
@@ -102,17 +102,30 @@ An LLM tool-calling loop. The tools are the only bridge to the engine:
 
 All tool schemas are strict (no additional properties, enums for closed
 sets), so a malformed call fails validation instead of corrupting state.
+Two invariants are enforced in code, not prompt: no availability
+without qualification, and book/reschedule only accept a slot_id from
+the latest ranked offer, so the model cannot book a time it invented.
 
-Providers (LLM, STT, TTS) sit behind small interfaces in
-`agent/providers/`; the default stack is OpenAI gpt-4o-mini, Deepgram
-nova-3 and Cartesia Sonic, each swappable by environment variable.
+LLM providers are stateless adapters behind one interface
+(`agent/providers/`): OpenAI (gpt-4o-mini) and Gemini (2.5-flash) are
+implemented and live-tested; the conversation history is kept in a
+neutral format and translated per call, which is what makes providers
+swappable mid-project. A scripted provider drives the test suite, so
+the loop and toolbox are fully tested without any API key.
 
-### Language switching - planned, phase 2 (Telegram) and 3 (realtime)
+The loop is bounded (max tool rounds, fail-safe reply) and exposed
+through an interactive CLI (`python -m agent.cli`) and a replayable
+demo (`scripts/demo_conversation.py`).
 
-STT tags each utterance with a detected language. The agent replies in
-the language of the last user message; the orchestrator selects the TTS
-voice accordingly. Adding a language is configuration plus one prompt
-translation, not code.
+### Language switching - built (text), voice in phases 2 and 3
+
+The channel tags each utterance with its detected language (Deepgram
+provides this per utterance in voice channels); the loop prepends an
+authoritative `[lang=xx]` tag that the system prompt declares binding.
+Deterministic tagging beats hoping the model notices: live tests showed
+both providers ignoring a mid-call switch until the tag was added. The
+orchestrator will select the TTS voice from the same tag. Adding a
+language is configuration plus one prompt translation, not code.
 
 ### Channels (`channels/`) - planned, phases 2 to 4
 

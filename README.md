@@ -154,7 +154,39 @@ uv run python scripts/demo_conversation.py        # replay a full booking,
 - [x] **Phase 2: Telegram.** Mixed text and voice in one conversation, voice notes in and out (Deepgram nova-3 multilingual + Cartesia sonic-3, one voice across languages), per-chat sessions, find/cancel/reschedule by phone number, all hardened against real sessions (see [docs/design-decisions.md](docs/design-decisions.md))
 - [x] **Phase 3: realtime.** LiveKit pipeline (same brain via `llm_node`), local console voice mode, barge-in, live language switching, spoken filler during tool rounds; full voice booking with digit-by-digit phone correction validated live (2.1-4.8s per turn)
 - [ ] **Phase 4: phone.** Free Vapi number wired to the same brain, end-to-end call demo
-- [ ] **Phase 5: proof.** Agent-vs-agent eval harness (simulated patients + structured judge), per-language success metrics in CI, slot-scoring visualizer
+- [x] **Phase 5: proof.** Agent-vs-agent eval harness: 12 scenarios (races, garbled identities, escalations), deterministic verdicts + advisory LLM judge, campaign report, Opik traces with feedback scores, weekly/dispatch CI workflow. Current campaign: 12/12
+- [ ] Slot-scoring visualizer, PSTN channel (Vapi free number)
+
+## Evaluation
+
+The agent is tested by agents: LLM-simulated patients (running on a
+different provider than the agent under test) play 12 scripted
+scenarios against the production brain and a live calendar, including
+a mid-call slot race injected by the runner, an STT-garbled name that
+must be recovered by spelling, and a fully blocked day that must end
+in escalation. Verdicts are deterministic (final calendar state + tool
+trace, see `evals/checks.py`); an LLM judge adds advisory quality
+findings but never gates.
+
+Campaign of 2026-07-15, agent `gpt-4o-mini`, personas/judge
+`gemini-2.5-flash`:
+
+| metric | result |
+| --- | --- |
+| scenarios passed | **12/12** |
+| outcome contract (booking/cancel/reschedule, exact identity, allowed window) | 12/12 |
+| zero hallucinated times | 12/12 |
+| booked only offered slots | 12/12 |
+| qualification before availability | 12/12 |
+| language followed (incl. mid-call switch) | 12/12 |
+| judge: identity read back before booking | 9/10 |
+| judge: professional tone | 11/12 |
+
+Reproduce with `uv run python -m evals` (needs OPENAI_API_KEY and
+GEMINI_API_KEY). The first campaigns caught three real defects that are
+now fixed and regression-tested: local-format phone numbers missed by
+the booking lookup, bookings silently assumed for today when no day was
+given, and two over-strict checks (see design decision 8).
 
 ## Observability (optional)
 

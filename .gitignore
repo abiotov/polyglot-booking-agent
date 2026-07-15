@@ -24,6 +24,7 @@ htmlcov/
 # Local data (Radicale storage, recordings, transcripts, session logs)
 data/
 logs/
+evals/results/
 *.wav
 *.ogg
 *.mp3

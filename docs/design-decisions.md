@@ -125,6 +125,15 @@ Realtime (console) sessions added their own rows:
 | A French turn transcribed in Japanese reached the brain | mostly_latin guard shared across channels; realtime asks to repeat |
 | Garbled identity ("Bon nom complique ben jao") booked | Spell-out names, digit-by-digit phones, mandatory read-back; the digit correction loop worked in the very next session |
 
+Then the eval harness (phase 5) industrialized the loop and added:
+
+| Caught by a campaign | Shipped guard |
+| --- | --- |
+| Caller gave a local-format number ('94 22 11 00'); strict-equality lookup missed the booking and a duplicate was created | Suffix-based phones_match shared adapter-wide, regression-tested |
+| No day given by the caller: the agent silently booked TODAY | Prompt: ask for the day, never assume |
+| Agent advised a caller to "contact the practice" (it IS the practice) | Prompt: you are the reception, offer what you can do |
+| Checks stricter than the architecture (guard-refused ranking flagged; caller-echoed times flagged) | Checks calibrated: refusals are the guard working; echoing the caller is conversation |
+
 **Why it matters.** Synthetic audio (TTS-generated test clips) passes
 where real phone microphones fail. The lab round trip validated the
 pipeline; only production sessions surfaced these seven failures. The

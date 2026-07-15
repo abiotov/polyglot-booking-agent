@@ -191,10 +191,29 @@ and the Telegram channel handlers. The check happens at call time, not
 import time, so entrypoints can load .env in main(). Verdicts never
 come from Opik: it visualizes and compares, deterministic checks judge.
 
-### Evaluation harness (`evals/`) - planned, phase 5
+### Evaluation harness (`evals/`) - built (phase 5)
 
-LLM-simulated patient personas converse with the agent; a structured
-judge inspects the transcript and the final calendar state (right slot
-booked, identity confirmed, no rule violated, language followed).
-Scenarios are YAML, replayed in CI, with per-language success rates
-reported in the README.
+LLM-simulated patient personas (on a different provider than the agent
+under test) play YAML scenarios against the production brain and a
+fresh live calendar per scenario. The runner can inject a mid-call
+race (a manual event lands on the top offered slot, as the
+practitioner's phone would).
+
+The verdict is layered, per design decision 8:
+
+- **Deterministic checks gate**: final calendar state against the
+  scenario's contract (outcome, exact identity with phone
+  normalization, allowed window, escalation contact actually given)
+  and tool-trace invariants (no successful ranking before
+  qualification, book only offered slot ids, zero hallucinated times:
+  every HH:MM the agent utters must come from a tool result or the
+  caller's own words).
+- **An LLM judge advises, never gates**: identity read back before
+  booking, professional tone, no promised-but-not-done actions.
+
+Campaigns produce a JSON + markdown report (evals/results/, CI
+artifact), and with Opik configured each scenario is one trace carrying
+its verdicts as feedback scores. A weekly/dispatch GitHub workflow
+(evals.yml) runs the full campaign. The first campaigns caught three
+real defects (local-format phone lookup, day assumed when not given,
+two over-strict checks), all fixed and regression-tested.

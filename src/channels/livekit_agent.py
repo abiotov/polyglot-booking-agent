@@ -135,6 +135,13 @@ async def entrypoint(ctx: JobContext) -> None:
         stt=deepgram.STT(model="nova-3", language="multi"),
         tts=tts,
         vad=silero.VAD.load(),
+        # Live sessions on a slow uplink saw final transcripts arrive
+        # seconds after the audio; give the STT room before committing a
+        # turn, and require a real utterance to count as an interruption
+        # (Bluetooth mics produce spurious blips).
+        min_endpointing_delay=1.0,
+        max_endpointing_delay=8.0,
+        min_interruption_duration=0.8,
     )
     await session.start(
         agent=RealtimeReceptionist(brain, tts, voices, languages),

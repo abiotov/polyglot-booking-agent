@@ -60,7 +60,7 @@ class DeepgramSTT:
         return Utterance(text=text, language=language)
 
     def _request(self, audio: bytes, mime_type: str, detect: bool) -> tuple[str, str]:
-        params: list[tuple[str, str]] = [
+        params: list[tuple[str, str | int | float | bool | None]] = [
             ("model", self._model),
             ("smart_format", "true"),
         ]

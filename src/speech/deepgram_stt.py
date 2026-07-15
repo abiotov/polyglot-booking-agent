@@ -38,6 +38,19 @@ _ENDPOINT = "https://api.deepgram.com/v1/listen"
 Params = list[tuple[str, str | int | float | bool | None]]
 
 
+def _mostly_latin(text: str) -> bool:
+    """True if at least half of the letters are Latin-script.
+
+    Latin covers ASCII plus the accented ranges used by French
+    (Latin-1 Supplement, Latin Extended-A/B end at U+024F).
+    """
+    letters = [ch for ch in text if ch.isalpha()]
+    if not letters:
+        return True  # nothing to judge; emptiness is handled separately
+    latin = sum(1 for ch in letters if ord(ch) <= 0x024F)
+    return latin / len(letters) >= 0.5
+
+
 class DeepgramSTT:
     def __init__(
         self,
@@ -61,10 +74,17 @@ class DeepgramSTT:
 
     def transcribe(self, audio: bytes, mime_type: str) -> Utterance:
         text, language = self._multilingual_request(audio, mime_type)
-        if not text.strip():
+        if not text.strip() or not _mostly_latin(text):
+            # Multi mode covers ~10 languages and can hallucinate one on a
+            # noisy short clip (a live session was transcribed in Mandarin).
+            # The practice's languages are Latin-script, so a mostly
+            # non-Latin transcript is a recognition failure, not a caller
+            # speaking Chinese.
             logger.info(
-                "empty transcript in multi mode (%d KB); retrying with lang=%s forced",
+                "unusable transcript in multi mode (%d KB, %r); "
+                "retrying with lang=%s forced",
                 len(audio) // 1024,
+                text[:40],
                 self._fallback_language,
             )
             text, language = self._forced_request(audio, mime_type)

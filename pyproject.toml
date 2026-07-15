@@ -69,11 +69,11 @@ packages = ["scheduling_engine", "calendar_adapter"]
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["caldav.*", "icalendar.*"]
+module = ["caldav.*", "icalendar.*", "radicale.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["calendar_adapter.adapter"]
-# caldav is untyped; calls into it are checked at the boundary instead
+module = ["calendar_adapter.adapter", "calendar_adapter.devserver"]
+# caldav and radicale are untyped; calls are checked at the boundary
 disallow_untyped_calls = false
 warn_return_any = false

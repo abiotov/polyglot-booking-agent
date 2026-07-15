@@ -30,7 +30,7 @@ flowchart LR
 The system is three layers with strict boundaries:
 
 | Layer | Responsibility | Must never |
-|---|---|---|
+| --- | --- | --- |
 | Channels | Turn audio/text of a given transport into agent messages and back | Contain business logic |
 | Agent | Understand the caller, collect qualification, call tools | Decide availability or invent slots |
 | Engine + calendar | Decide which slots exist, in which order, and persist bookings | Talk to the user |
@@ -63,26 +63,38 @@ score, so any ranking decision can be traced and displayed.
 Determinism is a contract, verified by tests: same inputs, same output,
 ordering by score descending then start time ascending.
 
-### Calendar adapter (`calendar_adapter/`) - planned, phase 1
+### Calendar adapter (`src/calendar_adapter/`) - built
 
 Translates between the engine's `BusyInterval` view and a CalDAV server.
-Key behaviors:
+Key behaviors, all covered by integration tests against a live Radicale
+instance (the same in-process dev server the quickstart uses):
 
-- **Read-before-write.** The slot is re-checked against the live calendar
-  immediately before writing the booking. If it was taken meanwhile (the
-  practitioner blocked it from their phone), the booking is refused and
-  the agent re-ranks and re-offers.
-- **Never overwrite.** The agent only creates new events on verified-free
-  slots and only modifies events it created itself (tagged in the event).
+- **Read-before-write.** `book()` re-checks the span against the live
+  calendar immediately before writing. If it was taken meanwhile (the
+  practitioner blocked it from their phone), `SlotTakenError` is raised
+  and the agent re-ranks and re-offers. CalDAV has no transactions; this
+  shrinks the race window to milliseconds, which is acceptable for a
+  single-practice calendar.
+- **Never overwrite.** Every agent-created event carries the
+  `POLYGLOT-AGENT` category; `cancel()` and `reschedule()` refuse
+  anything else (`NotAgentEventError`). The practitioner's own events
+  are read-only facts.
+- **Manual blocks and vacations respected.** Events tagged `BLOCK`
+  surface as `kind="block"`; all-day events block the whole day.
 - Radicale in development, any CalDAV endpoint in production. Timezone
   conversion happens here; the engine works in naive practice-local time.
+
+`calendar_adapter.devserver` serves Radicale in-process for development
+and tests (it also works around a Radicale startup probe that crashes on
+Windows without Developer Mode). `scripts/run_radicale.py` starts it;
+`scripts/seed_calendar.py` fills a realistic demo week.
 
 ### Conversational agent (`agent/`) - planned, phase 1
 
 An LLM tool-calling loop. The tools are the only bridge to the engine:
 
 | Tool | Contract |
-|---|---|
+| --- | --- |
 | `qualify` | Enum-validated client type, visit type, service. Required before any availability question is answered. |
 | `get_ranked_slots` | Returns ranked slots from the engine. The LLM never sees the raw calendar. |
 | `book` | Requires a `slot_id` previously returned by `get_ranked_slots`, plus confirmed name and phone. |

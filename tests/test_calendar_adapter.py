@@ -1,24 +1,19 @@
 """Integration tests: the adapter against a live Radicale server.
 
-A real Radicale application is served in-process (wsgiref on a free
-port, temporary storage folder), so these tests exercise the actual
-CalDAV protocol end to end, not a mock. In-process also lets us work
-around a Radicale probe that crashes on Windows (see _patched_probe).
+The same in-process dev server the quickstart uses
+(calendar_adapter.devserver) is started on a free port with a temporary
+storage folder, so these tests exercise the actual CalDAV protocol end
+to end, not a mock.
 """
 
 from __future__ import annotations
 
 import threading
 from collections.abc import Iterator
-from contextlib import contextmanager
 from datetime import date, datetime
-from wsgiref.simple_server import WSGIRequestHandler, make_server
 
 import caldav
 import pytest
-import radicale
-import radicale.config
-import radicale.pathutils
 
 from calendar_adapter import (
     CalDAVCalendar,
@@ -26,54 +21,14 @@ from calendar_adapter import (
     NotAgentEventError,
     SlotTakenError,
 )
+from calendar_adapter.devserver import make_dev_server
 
 MONDAY = date(2026, 7, 20)
 
 
-class _QuietHandler(WSGIRequestHandler):
-    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
-        pass
-
-
-@contextmanager
-def _patched_probe() -> Iterator[None]:
-    """Make Radicale's symlink probe survive Windows.
-
-    radicale.pathutils.path_supports_symlink only catches
-    PermissionError, but os.symlink on Windows without Developer Mode
-    raises a plain OSError (WinError 1314), crashing storage startup.
-    Answering "no symlink support" is the truthful behavior.
-    """
-    original = radicale.pathutils.path_supports_symlink
-
-    def safe_probe(path: str) -> bool:
-        try:
-            return bool(original(path))
-        except OSError:
-            return False
-
-    radicale.pathutils.path_supports_symlink = safe_probe
-    try:
-        yield
-    finally:
-        radicale.pathutils.path_supports_symlink = original
-
-
 @pytest.fixture(scope="module")
 def radicale_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
-    storage = tmp_path_factory.mktemp("radicale-storage")
-    configuration = radicale.config.load()
-    configuration.update(
-        {
-            "auth": {"type": "none"},
-            "storage": {"filesystem_folder": str(storage)},
-        },
-        "test",
-        privileged=True,
-    )
-    with _patched_probe():
-        application = radicale.Application(configuration)
-    server = make_server("127.0.0.1", 0, application, handler_class=_QuietHandler)
+    server = make_dev_server(tmp_path_factory.mktemp("radicale-storage"))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

@@ -59,7 +59,7 @@ The day is divided into fixed slots (default 15 minutes). Ranking happens in two
 
 **Stage 2: compaction scoring.** Among candidates, each slot gets a score that rewards keeping the schedule compact. Example with opening hours 08:00 to 14:00:
 
-```
+```text
 08:00 free   08:15 free   08:30 BOOKED   08:45 free
 09:00 free   09:15 free   09:30 free     09:45 BOOKED   10:00 free
 ```
@@ -75,7 +75,7 @@ Speech-to-text (Deepgram nova-3) tags every utterance with its detected language
 ## Tech stack
 
 | Concern | Default | Swappable with |
-|---|---|---|
+| --- | --- | --- |
 | LLM | OpenAI gpt-4o-mini | Gemini Flash, Claude (common `LLMProvider` interface) |
 | STT | Deepgram nova-3 (streaming, multilingual) | faster-whisper (local) |
 | TTS | Cartesia Sonic (sub-100ms) | Piper (local, zero cost) |
@@ -88,15 +88,17 @@ Every provider sits behind a small interface. Swapping means changing an environ
 
 ## Project structure
 
-```
-├── src/scheduling_engine/   # pure domain logic: constraints, scoring, config
-├── calendar_adapter/        # CalDAV I/O, read-before-write     (phase 1)
+```text
+├── src/
+│   ├── scheduling_engine/   # pure domain logic: constraints, scoring, config
+│   └── calendar_adapter/    # CalDAV I/O, read-before-write, dev server
 ├── agent/                   # LLM loop, typed tools, prompts    (phase 1)
 ├── channels/                # telegram, livekit, vapi           (phases 2-4)
 ├── evals/                   # simulated patients + LLM judge    (phase 5)
+├── scripts/                 # run_radicale.py, seed_calendar.py
 ├── config/                  # practice.example.yaml
 ├── docs/                    # architecture and design decisions
-└── tests/
+└── tests/                   # unit, property-based and live-CalDAV integration
 ```
 
 ## Quickstart
@@ -108,10 +110,38 @@ uv sync --extra dev
 uv run pytest
 ```
 
+Try the engine against a real calendar:
+
+```bash
+# terminal 1: local CalDAV server (Radicale, in-process, Windows-safe)
+uv run python scripts/run_radicale.py
+
+# terminal 2: seed a realistic week, then rank Monday's slots
+uv run python scripts/seed_calendar.py
+uv run python - <<'PY'
+from datetime import date, timedelta
+from calendar_adapter import CalDAVCalendar
+from scheduling_engine import load_config, rank_slots
+
+cal = CalDAVCalendar(url="http://127.0.0.1:5232", username="agent", password="agent",
+                     timezone="Africa/Porto-Novo")
+monday = date.today() - timedelta(days=date.today().weekday())
+for slot in rank_slots(monday, cal.busy_intervals(monday), "premium",
+                       load_config("config/practice.example.yaml"))[:5]:
+    print(slot.start.strftime("%H:%M"), slot.score, slot.score_breakdown)
+PY
+```
+
+Point Thunderbird or DAVx5 at `http://127.0.0.1:5232` to edit the same
+calendar by hand and watch the ranking react.
+
 ## Roadmap
 
 - [x] Repository bootstrap, CI, docs
-- [ ] **Phase 1: the brain.** Scheduling engine (constraints + compaction scoring, fully tested), Radicale + CalDAV adapter, text-mode agent with strict tools, FR/EN
+- [ ] **Phase 1: the brain.**
+  - [x] Scheduling engine: constraints + compaction scoring, unit and property-based tests
+  - [x] CalDAV adapter: read-before-write, agent-owned events, live-Radicale integration tests
+  - [ ] Text-mode agent with strict tools, FR/EN
 - [ ] **Phase 2: Telegram.** Voice notes in and out, first language switching
 - [ ] **Phase 3: realtime.** LiveKit pipeline (Deepgram, LLM, Cartesia), browser demo, barge-in, live language switching
 - [ ] **Phase 4: phone.** Free Vapi number wired to the same brain, end-to-end call demo

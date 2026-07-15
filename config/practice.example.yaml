@@ -1,0 +1,44 @@
+# Example practice configuration.
+# Copy to practice.yaml and adjust. Everything the scheduling engine
+# decides with is defined here; nothing is hardcoded.
+
+practice:
+  name: "Example Practice"
+  timezone: "Africa/Porto-Novo"
+  languages: ["fr", "en"]
+
+slots:
+  duration_minutes: 15
+
+opening_hours:
+  monday: ["08:00-14:00"]
+  tuesday: ["08:00-14:00"]
+  wednesday: ["08:00-14:00"]
+  thursday: ["08:00-14:00"]
+  friday: ["08:00-12:00"]
+
+# Client categories. Windows restrict when a category may book.
+# Priority 1 is highest. An escalation contact may be offered when
+# no suitable slot exists (omit to disable).
+client_types:
+  premium:
+    priority: 1
+    windows: ["08:00-12:00"]
+    escalation_contact: "+22900000000"
+  standard:
+    priority: 2
+    windows: ["10:00-14:00"]
+
+visit_types:
+  first_visit:
+    label_fr: "Première visite"
+    label_en: "First visit"
+  follow_up:
+    label_fr: "Suivi"
+    label_en: "Follow-up"
+
+# Compaction scoring. A free slot earns points for each occupied
+# neighbor; isolated slots score 0 and are offered last.
+scoring:
+  adjacent_before: 10   # the slot right before an existing appointment
+  adjacent_after: 8     # the slot right after an existing appointment

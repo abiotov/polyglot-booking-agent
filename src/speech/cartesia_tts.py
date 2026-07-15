@@ -3,6 +3,12 @@
 One voice per language, selected from the [lang=xx] tag the agent
 already maintains. Output is MP3, which Telegram accepts for voice
 notes and browsers can play directly.
+
+Model note: sonic-3 is the default because it is the first Sonic that
+speaks a foreign language with a native voice convincingly. Live checks
+showed a French voice producing gibberish English under sonic-2 and
+clean English under sonic-3, which is what allows one single voice (one
+receptionist persona) across languages.
 """
 
 from __future__ import annotations
@@ -20,7 +26,7 @@ class CartesiaTTS:
         self,
         api_key: str,
         voices: dict[str, str],
-        model: str = "sonic-2",
+        model: str = "sonic-3",
         fallback_language: str = "fr",
         timeout: float = 60.0,
     ) -> None:

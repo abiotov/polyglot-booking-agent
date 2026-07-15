@@ -10,10 +10,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import os
+from collections.abc import Awaitable
+from typing import TypeVar
 
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Chat, Update
+from telegram.constants import ChatAction
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -30,10 +34,12 @@ from speech import CartesiaTTS, DeepgramSTT
 
 from .telegram_channel import TelegramChannel
 
-DEFAULT_VOICES = {
-    "fr": "faa75703-00e3-4a57-9955-0703001e3231",  # Amelie
-    "en": "62ae83ad-4f6a-430b-af41-a9bede9286ca",  # Gemma
-}
+T = TypeVar("T")
+
+# One voice for every language: the receptionist keeps her identity
+# when the caller switches language (sonic-3 handles cross-language).
+_AMELIE = "faa75703-00e3-4a57-9955-0703001e3231"
+DEFAULT_VOICES = {"fr": _AMELIE, "en": _AMELIE}
 
 GREETING = (
     "Bonjour ! Je suis la réceptionniste. Écrivez-moi ou envoyez une note "
@@ -76,8 +82,32 @@ def build_channel(
     )
 
 
+async def _with_chat_action(chat: Chat, action: ChatAction, work: Awaitable[T]) -> T:
+    """Show 'typing' / 'recording voice' for as long as `work` runs.
+
+    A Telegram chat action expires after ~5 seconds, so it is re-sent
+    on a timer until the work completes.
+    """
+
+    async def keep_alive() -> None:
+        while True:
+            await chat.send_chat_action(action)
+            await asyncio.sleep(4.0)
+
+    task = asyncio.create_task(keep_alive())
+    try:
+        return await work
+    finally:
+        task.cancel()
+
+
 def main() -> None:
     load_dotenv()
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
+    # Keep per-request HTTP noise out of the operational log.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--provider", default="openai", choices=["openai", "gemini"])
     parser.add_argument("--config", default="config/practice.example.yaml")
@@ -95,8 +125,13 @@ def main() -> None:
         message = update.message
         if message is None or message.text is None or message.chat is None:
             return
-        # Blocking work (LLM, calendar) runs off the event loop.
-        reply = await asyncio.to_thread(channel.handle_text, message.chat.id, message.text)
+        # Blocking work (LLM, calendar) runs off the event loop; the
+        # caller sees "typing..." for the whole duration.
+        reply = await _with_chat_action(
+            message.chat,
+            ChatAction.TYPING,
+            asyncio.to_thread(channel.handle_text, message.chat.id, message.text),
+        )
         await message.reply_text(reply.text)
 
     async def on_voice(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
@@ -106,8 +141,10 @@ def main() -> None:
         telegram_file = await message.voice.get_file()
         audio = bytes(await telegram_file.download_as_bytearray())
         mime_type = message.voice.mime_type or "audio/ogg"
-        reply = await asyncio.to_thread(
-            channel.handle_voice, message.chat.id, audio, mime_type
+        reply = await _with_chat_action(
+            message.chat,
+            ChatAction.RECORD_VOICE,
+            asyncio.to_thread(channel.handle_voice, message.chat.id, audio, mime_type),
         )
         if reply.voice is not None:
             await message.reply_voice(voice=reply.voice.data, caption=reply.text[:1024])

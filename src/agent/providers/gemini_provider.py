@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from google import genai
 from google.genai import types as gtypes
@@ -29,7 +29,8 @@ class GeminiProvider:
     ) -> ProviderReply:
         response = self._client.models.generate_content(
             model=self._model,
-            contents=self._to_contents(history),
+            # cast: the SDK's ContentListUnion defeats list invariance
+            contents=cast(Any, self._to_contents(history)),
             config=gtypes.GenerateContentConfig(
                 system_instruction=system,
                 tools=[

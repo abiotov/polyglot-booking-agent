@@ -35,6 +35,7 @@ from typing import Any
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, cli, llm
 from livekit.plugins import cartesia, deepgram, silero
+from livekit.plugins import openai as lk_openai
 
 from agent import BookingAgent, BookingToolbox, build_system_prompt
 from agent.providers import get_provider
@@ -133,6 +134,12 @@ async def entrypoint(ctx: JobContext) -> None:
     tts = cartesia.TTS(model="sonic-3", language=languages[0], voice=voices[languages[0]])
     session: AgentSession[Any] = AgentSession(
         stt=deepgram.STT(model="nova-3", language="multi"),
+        # AgentSession skips reply generation entirely when llm is None
+        # (agent_activity.py: "skip response if no llm is set"), even with
+        # llm_node overridden. This plugin instance is that gate's
+        # placeholder; it is never invoked, RealtimeReceptionist.llm_node
+        # short-circuits it.
+        llm=lk_openai.LLM(model="gpt-4o-mini"),
         tts=tts,
         vad=silero.VAD.load(),
         # Live sessions on a slow uplink saw final transcripts arrive
@@ -140,7 +147,7 @@ async def entrypoint(ctx: JobContext) -> None:
         # turn, and require a real utterance to count as an interruption
         # (Bluetooth mics produce spurious blips).
         min_endpointing_delay=1.0,
-        max_endpointing_delay=8.0,
+        max_endpointing_delay=4.0,
         min_interruption_duration=0.8,
     )
     await session.start(

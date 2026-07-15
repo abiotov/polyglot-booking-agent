@@ -38,6 +38,7 @@ from livekit.plugins import cartesia, deepgram, silero
 from livekit.plugins import openai as lk_openai
 
 from agent import BookingAgent, BookingToolbox, build_system_prompt
+from agent.loop import FinalReply, ToolRound, TurnEvent
 from agent.providers import get_provider
 from calendar_adapter import CalDAVCalendar
 from scheduling_engine import load_config
@@ -52,6 +53,14 @@ GREETING = (
     "Bonjour, vous êtes bien à l'accueil. Comment puis-je vous aider ? "
     "Hello, you have reached the reception. How can I help?"
 )
+
+# Spoken while calendar tool rounds run their network round trips
+# (measured at 5-13s of dead air otherwise on a slow uplink).
+FILLERS = {
+    "fr": "Un instant, je consulte le planning.",
+    "en": "One moment, let me check the schedule.",
+}
+_FILLER_TOOLS = {"get_ranked_slots", "book", "reschedule", "cancel", "find_bookings"}
 
 
 class RealtimeReceptionist(Agent):
@@ -103,11 +112,38 @@ class RealtimeReceptionist(Agent):
         # The reply will be voiced in the caller's language.
         self._voice_tts.update_options(language=language, voice=self._voices[language])
 
-        reply = await asyncio.to_thread(
-            self._brain.run_turn, user_text, None, language
-        )
-        logger.info("lang=%s heard=%r reply_len=%d", language, user_text[:80], len(reply))
-        yield reply
+        # The brain runs in a worker thread and streams progress events;
+        # a filler is spoken the moment a calendar tool round starts so
+        # the caller never sits through the tool round trips in silence.
+        queue: asyncio.Queue[TurnEvent | None] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        def _run_brain() -> None:
+            try:
+                for event in self._brain.run_turn_events(user_text, None, language):
+                    loop.call_soon_threadsafe(queue.put_nowait, event)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        brain_task = loop.run_in_executor(None, _run_brain)
+        filler_spoken = False
+        try:
+            while (event := await queue.get()) is not None:
+                if (
+                    isinstance(event, ToolRound)
+                    and not filler_spoken
+                    and _FILLER_TOOLS.intersection(event.names)
+                ):
+                    filler_spoken = True
+                    yield FILLERS.get(language, FILLERS["fr"])
+                elif isinstance(event, FinalReply):
+                    logger.info(
+                        "lang=%s heard=%r reply_len=%d",
+                        language, user_text[:80], len(event.text),
+                    )
+                    yield event.text
+        finally:
+            await brain_task
 
 
 def _last_user_text(chat_ctx: llm.ChatContext) -> str:
@@ -157,7 +193,7 @@ async def entrypoint(ctx: JobContext) -> None:
         # seconds after the audio; give the STT room before committing a
         # turn, and require a real utterance to count as an interruption
         # (Bluetooth mics produce spurious blips).
-        min_endpointing_delay=1.0,
+        min_endpointing_delay=0.6,
         max_endpointing_delay=4.0,
         min_interruption_duration=0.8,
     )

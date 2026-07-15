@@ -244,6 +244,35 @@ def test_find_bookings_by_phone_closes_the_loop(
     assert calendar.busy_intervals(MONDAY) == []
 
 
+def test_turn_events_expose_tool_rounds_then_final_reply(
+    calendar: CalDAVCalendar, config: PracticeConfig
+) -> None:
+    """Voice channels speak a filler on ToolRound and the text on FinalReply."""
+    from agent.loop import FinalReply, ToolRound
+
+    toolbox = BookingToolbox(calendar, config)
+    provider = ScriptedProvider(
+        [
+            ProviderReply(
+                tool_calls=(
+                    _call("qualify", "c1", client_type="premium", visit_type="first_visit"),
+                    _call("get_ranked_slots", "c2", day="2026-07-20"),
+                )
+            ),
+            ProviderReply(text="Je peux vous proposer 08:00."),
+        ]
+    )
+    agent = BookingAgent(provider, toolbox, build_system_prompt(config))
+    events = list(agent.run_turn_events("Un rendez-vous lundi ?", today=MONDAY))
+
+    assert events == [
+        ToolRound(names=("qualify", "get_ranked_slots")),
+        FinalReply(text="Je peux vous proposer 08:00."),
+    ]
+    # run_turn stays a thin wrapper over the same event stream.
+    assert isinstance(events[-1], FinalReply)
+
+
 def test_language_tag_from_the_channel_is_prepended(
     calendar: CalDAVCalendar, config: PracticeConfig
 ) -> None:

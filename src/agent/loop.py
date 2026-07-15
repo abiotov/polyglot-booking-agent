@@ -8,13 +8,30 @@ toolbox's session state; the provider is stateless and swappable.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import date
+from typing import NamedTuple
 
 from .providers.base import LLMProvider
 from .tools import BookingToolbox
 from .types import ChatMessage
 
 DEFAULT_MAX_TOOL_ROUNDS = 8
+
+
+class ToolRound(NamedTuple):
+    """The brain is about to execute these tools (progress signal)."""
+
+    names: tuple[str, ...]
+
+
+class FinalReply(NamedTuple):
+    """The brain's user-facing answer for this turn."""
+
+    text: str
+
+
+TurnEvent = ToolRound | FinalReply
 
 
 class BookingAgent:
@@ -37,13 +54,28 @@ class BookingAgent:
         today: date | None = None,
         language: str | None = None,
     ) -> str:
-        """Process one caller message and return the agent's reply.
+        """Process one caller message and return the agent's reply."""
+        for event in self.run_turn_events(user_text, today=today, language=language):
+            if isinstance(event, FinalReply):
+                return event.text
+        raise AssertionError("run_turn_events always ends with a FinalReply")
 
-        `language` is the utterance language detected by the channel
-        (Deepgram tags every utterance in voice channels). When present
-        it is prepended as a [lang=xx] tag that the system prompt
-        declares authoritative, which makes mid-call language switching
-        deterministic instead of hoping the model notices.
+    def run_turn_events(
+        self,
+        user_text: str,
+        today: date | None = None,
+        language: str | None = None,
+    ) -> Iterator[TurnEvent]:
+        """Like run_turn, but yields progress events as the turn unfolds.
+
+        Voice channels use the ToolRound events to speak a natural filler
+        ("one moment, let me check the schedule") while tool rounds cost
+        their network round trips, instead of leaving dead air.
+
+        `language` is the utterance language detected by the channel.
+        When present it is prepended as a [lang=xx] tag that the system
+        prompt declares authoritative, which makes mid-call language
+        switching deterministic instead of hoping the model notices.
         """
         system = self._system_prompt.replace(
             "{today}", (today or date.today()).isoformat()
@@ -56,8 +88,10 @@ class BookingAgent:
 
             if not reply.tool_calls:
                 self.history.append(ChatMessage(role="assistant", content=reply.text))
-                return reply.text
+                yield FinalReply(reply.text)
+                return
 
+            yield ToolRound(tuple(call.name for call in reply.tool_calls))
             self.history.append(
                 ChatMessage(role="assistant", content=reply.text, tool_calls=reply.tool_calls)
             )
@@ -76,4 +110,4 @@ class BookingAgent:
         # with a polite handover instead of looping forever.
         fallback = "I am sorry, something went wrong on my side. Could you repeat that?"
         self.history.append(ChatMessage(role="assistant", content=fallback))
-        return fallback
+        yield FinalReply(fallback)

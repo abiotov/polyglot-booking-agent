@@ -30,6 +30,7 @@ import asyncio
 import logging
 import os
 from collections.abc import AsyncIterable
+from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
@@ -209,7 +210,32 @@ def main() -> None:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
+    _add_session_file_log()
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+
+
+def _add_session_file_log() -> None:
+    """Mirror the session's diagnostics into logs/realtime-session.log.
+
+    Console mode scrolls fast and terminals truncate; the file keeps the
+    full picture (turn commits, transcript delays, our brain lines) for
+    post-session analysis without copy-pasting a terminal.
+    """
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+    handler = logging.FileHandler(log_dir / "realtime-session.log", encoding="utf-8")
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    for existing in root.handlers:
+        if not isinstance(existing, logging.FileHandler):
+            existing.setLevel(logging.INFO)  # keep the console readable
+    root.addHandler(handler)
+    for noisy in ("urllib3", "httpx", "asyncio", "hpack", "openai", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 if __name__ == "__main__":

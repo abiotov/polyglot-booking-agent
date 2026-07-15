@@ -21,8 +21,9 @@ htmlcov/
 .env.*
 !.env.example
 
-# Local data (Radicale storage, recordings, transcripts)
+# Local data (Radicale storage, recordings, transcripts, session logs)
 data/
+logs/
 *.wav
 *.ogg
 *.mp3

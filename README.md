@@ -80,7 +80,7 @@ Speech-to-text (Deepgram nova-3) tags every utterance with its detected language
 | STT | Deepgram nova-3 (streaming, multilingual) | faster-whisper (local) |
 | TTS | Cartesia Sonic (sub-100ms) | Piper (local, zero cost) |
 | Realtime transport | LiveKit Agents (WebRTC, interruptions) | |
-| Telephony | Vapi (free US number) | Any SIP trunk |
+| Telephony (planned) | Twilio SIP trunk | Any SIP provider |
 | Messaging | Telegram Bot API | |
 | Calendar | Radicale (dev) | iCloud, Google, any CalDAV server |
 
@@ -93,7 +93,7 @@ Every provider sits behind a small interface. Swapping means changing an environ
 │   ├── scheduling_engine/   # pure domain logic: constraints, scoring, config
 │   ├── calendar_adapter/    # CalDAV I/O, read-before-write, dev server
 │   └── agent/               # LLM loop, strict tools, providers, prompts, CLI
-├── channels/                # telegram, livekit, vapi           (phases 2-4)
+├── channels/                # telegram, livekit (console + browser)
 ├── evals/                   # simulated patients + LLM judge    (phase 5)
 ├── scripts/                 # run_radicale.py, seed_calendar.py
 ├── config/                  # practice.example.yaml
@@ -164,9 +164,9 @@ uv run python scripts/browser_call.py             # prints a browser link
   - [x] Text-mode agent: strict tools, OpenAI/Gemini adapters, FR/EN with mid-call switching
 - [x] **Phase 2: Telegram.** Mixed text and voice in one conversation, voice notes in and out (Deepgram nova-3 multilingual + Cartesia sonic-3, one voice across languages), per-chat sessions, find/cancel/reschedule by phone number, all hardened against real sessions (see [docs/design-decisions.md](docs/design-decisions.md))
 - [x] **Phase 3: realtime.** LiveKit pipeline (same brain via `llm_node`), local console voice mode, barge-in, live language switching, spoken filler during tool rounds; full voice booking with digit-by-digit phone correction validated live (2.1-4.8s per turn)
-- [ ] **Phase 4: phone.** Free Vapi number wired to the same brain, end-to-end call demo
+- [ ] **Phase 4: phone.** A PSTN number (Twilio SIP) wired to the same brain, end-to-end call demo
 - [x] **Phase 5: proof.** Agent-vs-agent eval harness: 12 scenarios (races, garbled identities, escalations), deterministic verdicts + advisory LLM judge, campaign report, Opik traces with feedback scores, weekly/dispatch CI workflow. Current campaign: 12/12
-- [ ] Slot-scoring visualizer, PSTN channel (Vapi free number)
+- [ ] Slot-scoring visualizer
 
 ## Evaluation
 

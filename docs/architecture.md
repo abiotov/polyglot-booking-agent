@@ -8,7 +8,7 @@
 ```mermaid
 flowchart LR
     subgraph Channels ["Channels (adapters)"]
-        P[Phone / PSTN via Vapi]
+        P[Phone / PSTN]
         W[Browser / WebRTC via LiveKit]
         T[Telegram voice notes]
     end
@@ -178,8 +178,8 @@ Realtime specifics, each earned from a live session:
 
 **Planned:**
 
-- **Vapi / PSTN** (phase 4): a free US number wired to the same brain;
-  Vapi acts as telephony transport only.
+- **PSTN telephony**: a phone number (Twilio SIP trunk) wired to the
+  same brain; the carrier is a transport adapter like every channel.
 
 ### Observability (`src/observability/`) - built
 

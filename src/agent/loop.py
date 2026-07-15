@@ -80,8 +80,12 @@ class BookingAgent:
         prompt declares authoritative, which makes mid-call language
         switching deterministic instead of hoping the model notices.
         """
+        # The date reference is deterministic harness work, not model
+        # work: a live session showed the model resolving "next
+        # Wednesday" to a weekend and relaying "no availability".
         system = self._system_prompt.replace(
-            "{today}", (today or date.today()).isoformat()
+            "{date_reference}",
+            self._toolbox.date_reference(today or date.today()),
         )
         content = f"[lang={language}] {user_text}" if language else user_text
         self.history.append(ChatMessage(role="user", content=content))

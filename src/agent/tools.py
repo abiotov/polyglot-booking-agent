@@ -15,14 +15,14 @@ enforced here, not in the prompt:
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from calendar_adapter import CalDAVCalendar, SlotTakenError
 from calendar_adapter.errors import CalendarError
 from observability import traced
 from scheduling_engine import rank_slots
-from scheduling_engine.models import PracticeConfig, ScoredSlot
+from scheduling_engine.models import WEEKDAY_NAMES, PracticeConfig, ScoredSlot
 
 from .types import ToolSpec
 
@@ -146,20 +146,54 @@ class BookingToolbox:
         return json.dumps({"ok": True, "client_type": client_type, "visit_type": visit_type})
 
     def _get_ranked_slots(self, args: dict[str, Any]) -> str:
+        """Availability for one day, with the queried day echoed back.
+
+        A live browser session showed the model computing wrong dates
+        for "next Wednesday" (weekend dates), being told "no slots", and
+        relaying "Wednesday is unavailable" to the caller. Every answer
+        now carries the day and weekday it is about, and distinguishes
+        "closed" from "fully booked", so a date mistake is visible to
+        the model instead of silently misleading.
+        """
         if self._client_type is None:
             return _error("caller is not qualified yet; call qualify first")
         day = date.fromisoformat(str(args["day"]))
+        today = self._now().date()
+        header: dict[str, Any] = {
+            "day": day.isoformat(),
+            "weekday": WEEKDAY_NAMES[day.weekday()],
+        }
+        if day < today:
+            return _error(
+                f"{day.isoformat()} ({header['weekday']}) is in the past; "
+                f"today is {today.isoformat()}"
+            )
+        if not self._config.opening_hours.get(WEEKDAY_NAMES[day.weekday()], ()):
+            return json.dumps(
+                header | {"open": False, "slots": [],
+                          "message": "the practice is closed that day"}
+            )
+
         busy = self._calendar.busy_intervals(day)
-        ranked = rank_slots(day, busy, self._client_type, self._config)[:MAX_OFFERED_SLOTS]
+        ranked = rank_slots(day, busy, self._client_type, self._config)
+        if day == today:
+            now = self._now()
+            ranked = [slot for slot in ranked if slot.start > now]
+        ranked = ranked[:MAX_OFFERED_SLOTS]
         self._offered = {slot.slot_id: slot for slot in ranked}
+
         if not ranked:
             escalation = self._config.client_types[self._client_type].escalation_contact
-            payload: dict[str, Any] = {"slots": [], "message": "no slot available that day"}
+            payload = header | {
+                "open": True, "slots": [], "message": "fully booked that day",
+            }
             if escalation:
                 payload["escalation_contact"] = escalation
             return json.dumps(payload)
         return json.dumps(
-            {
+            header
+            | {
+                "open": True,
                 "slots": [
                     {
                         "slot_id": slot.slot_id,
@@ -167,9 +201,30 @@ class BookingToolbox:
                         "rank": rank + 1,
                     }
                     for rank, slot in enumerate(ranked)
-                ]
+                ],
             }
         )
+
+    @staticmethod
+    def _now() -> datetime:
+        return datetime.now()
+
+    def date_reference(self, today: date) -> str:
+        """The next two weeks, resolved for the model (see prompts.py)."""
+        lines = [
+            f"Today is {WEEKDAY_NAMES[today.weekday()]} {today.isoformat()}.",
+            "Upcoming days (authoritative; use these exact dates to resolve",
+            "relative expressions like 'next Wednesday'; never compute dates",
+            "yourself):",
+        ]
+        from datetime import timedelta
+
+        for offset in range(1, 15):
+            day = today + timedelta(days=offset)
+            weekday = WEEKDAY_NAMES[day.weekday()]
+            status = "open" if self._config.opening_hours.get(weekday) else "closed"
+            lines.append(f"- {weekday} {day.isoformat()}: {status}")
+        return "\n".join(lines)
 
     def _book(self, args: dict[str, Any]) -> str:
         slot = self._offered.get(str(args["slot_id"]))

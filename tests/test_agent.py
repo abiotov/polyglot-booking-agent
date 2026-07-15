@@ -273,6 +273,59 @@ def test_turn_events_expose_tool_rounds_then_final_reply(
     assert isinstance(events[-1], FinalReply)
 
 
+def test_closed_day_is_named_not_just_empty(
+    calendar: CalDAVCalendar, config: PracticeConfig
+) -> None:
+    """A weekend query must say 'closed', echoing day and weekday."""
+    toolbox = BookingToolbox(calendar, config)
+    toolbox.dispatch("qualify", {"client_type": "premium", "visit_type": "first_visit"})
+    result = json.loads(toolbox.dispatch("get_ranked_slots", {"day": "2026-07-19"}))  # Sunday
+    assert result == {
+        "day": "2026-07-19",
+        "weekday": "sunday",
+        "open": False,
+        "slots": [],
+        "message": "the practice is closed that day",
+    }
+
+
+def test_past_date_is_refused(calendar: CalDAVCalendar, config: PracticeConfig) -> None:
+    toolbox = BookingToolbox(calendar, config)
+    toolbox.dispatch("qualify", {"client_type": "premium", "visit_type": "first_visit"})
+    result = json.loads(toolbox.dispatch("get_ranked_slots", {"day": "2020-01-06"}))
+    assert "error" in result and "past" in result["error"]
+
+
+def test_todays_elapsed_slots_are_not_offered(
+    calendar: CalDAVCalendar, config: PracticeConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """At 10:05 on an open day, 08:00-10:00 slots are gone."""
+    from datetime import datetime as real_datetime
+
+    toolbox = BookingToolbox(calendar, config)
+    monkeypatch.setattr(
+        BookingToolbox, "_now", staticmethod(lambda: real_datetime(2026, 7, 20, 10, 5))
+    )
+    toolbox.dispatch("qualify", {"client_type": "premium", "visit_type": "first_visit"})
+    result = json.loads(toolbox.dispatch("get_ranked_slots", {"day": "2026-07-20"}))
+    starts = [slot["start"] for slot in result["slots"]]
+    assert starts and all(s.split()[-1] >= "10:15" for s in starts)
+
+
+def test_system_prompt_carries_the_date_reference(
+    calendar: CalDAVCalendar, config: PracticeConfig
+) -> None:
+    toolbox = BookingToolbox(calendar, config)
+    provider = ScriptedProvider([ProviderReply(text="ok")])
+    agent = BookingAgent(provider, toolbox, build_system_prompt(config))
+    agent.run_turn("bonjour", today=date(2026, 7, 15))  # a Wednesday
+    # The provider received a system prompt resolving upcoming days.
+    assert not provider.seen_histories[0][0].content.startswith("{date_reference}")
+    reference = toolbox.date_reference(date(2026, 7, 15))
+    assert "monday 2026-07-20: open" in reference
+    assert "sunday 2026-07-19: closed" in reference
+
+
 def test_language_tag_from_the_channel_is_prepended(
     calendar: CalDAVCalendar, config: PracticeConfig
 ) -> None:

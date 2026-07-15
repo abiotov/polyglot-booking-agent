@@ -142,6 +142,17 @@ see `.env.example`):
 uv run python -m agent.cli --provider openai      # interactive chat
 uv run python scripts/demo_conversation.py        # replay a full booking,
                                                   # French to English mid-call
+uv run python -m channels.livekit_agent console   # realtime voice, local mic
+```
+
+Call the agent from your browser, fully self-hosted (download
+`livekit-server` from [livekit/livekit releases](https://github.com/livekit/livekit/releases)
+into `tools/`):
+
+```bash
+./tools/livekit-server --dev                      # terminal 1: WebRTC server
+uv run python -m channels.livekit_agent dev       # terminal 2: the agent
+uv run python scripts/browser_call.py             # prints a browser link
 ```
 
 ## Roadmap
@@ -168,25 +179,35 @@ in escalation. Verdicts are deterministic (final calendar state + tool
 trace, see `evals/checks.py`); an LLM judge adds advisory quality
 findings but never gates.
 
-Campaign of 2026-07-15, agent `gpt-4o-mini`, personas/judge
-`gemini-2.5-flash`:
+Campaigns of 2026-07-15, agent `gpt-4o-mini`, personas/judge
+`gemini-2.5-flash` (LLM behavior is stochastic; runs fluctuate between
+11/12 and 12/12, and the recurring failure is always the same one):
 
 | metric | result |
 | --- | --- |
-| scenarios passed | **12/12** |
-| outcome contract (booking/cancel/reschedule, exact identity, allowed window) | 12/12 |
+| scenarios passed | **11-12 / 12** |
 | zero hallucinated times | 12/12 |
 | booked only offered slots | 12/12 |
 | qualification before availability | 12/12 |
 | language followed (incl. mid-call switch) | 12/12 |
+| outcome contract (booking/cancel/reschedule, exact identity, window) | 11-12/12 |
 | judge: identity read back before booking | 9/10 |
 | judge: professional tone | 11/12 |
 
+The one flaky scenario is `garbled-identity` (an STT-mangled name that
+must be recovered by asking the caller to spell it): the agent
+sometimes books the mangled name. That is the known weak point of
+voice channels, first observed in live sessions, now quantified on
+every campaign instead of argued about.
+
 Reproduce with `uv run python -m evals` (needs OPENAI_API_KEY and
-GEMINI_API_KEY). The first campaigns caught three real defects that are
-now fixed and regression-tested: local-format phone numbers missed by
-the booking lookup, bookings silently assumed for today when no day was
-given, and two over-strict checks (see design decision 8).
+GEMINI_API_KEY). The first campaigns caught real defects that are now
+fixed and regression-tested: local-format phone numbers missed by the
+booking lookup, bookings silently assumed for today when no day was
+given, LLM date arithmetic resolving "next Wednesday" to a weekend
+(fixed with a deterministic date reference in the prompt and day
+echoes in tool results), and several over-strict checks (see design
+decision 8).
 
 ## Observability (optional)
 

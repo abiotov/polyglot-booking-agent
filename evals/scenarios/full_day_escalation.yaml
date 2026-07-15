@@ -4,9 +4,11 @@ persona:
   goal: book
   script_hint: >
     Tu veux absolument un rendez-vous le jour cible, aucun autre jour
-    ne t'intéresse. Quand on te dit qu'il n'y a rien, tu insistes une
-    fois, puis tu acceptes ce qu'on te propose comme solution de
-    secours et tu termines l'appel.
+    ne t'intéresse. Si on te propose un autre jour, tu REFUSES: tu ne
+    réserves rien d'autre que le jour cible. Quand on te dit qu'il n'y
+    a rien ce jour-là, tu insistes une fois, puis tu demandes s'il y a
+    un numéro ou un contact à appeler; tu notes ce qu'on te donne et tu
+    termines l'appel sans réserver.
   identity: { name: "Firmin Dansou", phone: "+229 99 00 11 22" }
   client_type: premium
   visit_type: first_visit

@@ -176,10 +176,18 @@ def _split_bookings(
 
 
 def _identity_matches(booking: Booking, name: str, phone: str) -> bool:
-    same_name = " ".join(booking.patient_name.split()).casefold() == " ".join(
-        name.split()
-    ).casefold()
-    return same_name and phones_match(booking.patient_phone, phone)
+    return _fold_name(booking.patient_name) == _fold_name(name) and phones_match(
+        booking.patient_phone, phone
+    )
+
+
+def _fold_name(name: str) -> str:
+    """Case- and accent-insensitive: 'Étienne' and 'Etienne' are the
+    same caller (caught live: the agent spelled the accent back in)."""
+    import unicodedata
+
+    decomposed = unicodedata.normalize("NFKD", " ".join(name.split()))
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()
 
 
 def _normalize_phone(phone: str) -> str:
@@ -246,6 +254,8 @@ def _slots_of(result_json: str) -> list[dict[str, Any]]:
 
 
 _TIME_PATTERN = re.compile(r"\b(\d{1,2})\s*[:hH]\s*(\d{2})\b")
+# "8h" with no minutes, as callers actually speak ("8h du matin").
+_HOUR_ONLY_PATTERN = re.compile(r"\b(\d{1,2})\s*[hH]\b(?!\s*\d)")
 
 
 def _check_no_hallucinated_times(result: ConversationResult) -> CheckResult:
@@ -261,13 +271,17 @@ def _check_no_hallucinated_times(result: ConversationResult) -> CheckResult:
         for h, m in _TIME_PATTERN.findall(record.result)
     }
     # Echoing a time the caller just said ("10h? no, that one is not
-    # available") is conversation, not invention.
-    allowed.update(
-        _canonical(h, m)
-        for exchange in result.transcript
-        if exchange.speaker == "patient"
-        for h, m in _TIME_PATTERN.findall(exchange.text)
-    )
+    # available") is conversation, not invention. Callers say both
+    # "8h00" and bare "8h"; the agent may echo either as HH:MM.
+    for exchange in result.transcript:
+        if exchange.speaker != "patient":
+            continue
+        allowed.update(
+            _canonical(h, m) for h, m in _TIME_PATTERN.findall(exchange.text)
+        )
+        allowed.update(
+            _canonical(h, "00") for h in _HOUR_ONLY_PATTERN.findall(exchange.text)
+        )
     for exchange in result.transcript:
         if exchange.speaker != "agent":
             continue

@@ -1,0 +1,18 @@
+id: full-day-escalation
+description: Premium day fully blocked; the escalation contact must be offered.
+persona:
+  goal: book
+  script_hint: >
+    Tu veux absolument un rendez-vous le jour cible, aucun autre jour
+    ne t'intéresse. Quand on te dit qu'il n'y a rien, tu insistes une
+    fois, puis tu acceptes ce qu'on te propose comme solution de
+    secours et tu termines l'appel.
+  identity: { name: "Firmin Dansou", phone: "+229 99 00 11 22" }
+  client_type: premium
+  visit_type: first_visit
+  languages: [fr]
+calendar_seed:
+  - { day_offset: 0, start: "08:00", end: "14:00", kind: block }
+expected:
+  outcome: escalated
+  language_follow: true

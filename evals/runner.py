@@ -97,12 +97,15 @@ def run_scenario(
     transcript: list[Exchange] = []
     ended_reason = "max_turns"
     turns = 0
+    race_injected = False
     text, language = patient.reply(None)
     try:
         while turns < scenario.max_turns:
             if text == END_MARKER:
                 ended_reason = "goal"
                 break
+            if scenario.inject_race and not race_injected:
+                race_injected = _maybe_inject_race(toolbox, calendar, radicale_url)
             transcript.append(Exchange(speaker="patient", text=text, language=language))
             reply = agent.run_turn(text, language=language)
             transcript.append(Exchange(speaker="agent", text=reply))
@@ -121,6 +124,30 @@ def run_scenario(
         turns=turns,
         ended_reason=ended_reason,
     )
+
+
+def _maybe_inject_race(
+    toolbox: RecordingToolbox,
+    calendar: CalDAVCalendar,
+    radicale_url: str,
+) -> bool:
+    """Steal the top offered slot, as the practitioner's phone would.
+
+    Fires once, on the first agent turn after slots were offered, so the
+    caller's acceptance runs into read-before-write.
+    """
+    import json
+
+    for record in reversed(toolbox.records):
+        if record.name != "get_ranked_slots":
+            continue
+        slots = json.loads(record.result).get("slots") or []
+        if not slots:
+            return False
+        start = datetime.fromisoformat(slots[0]["slot_id"])
+        _manual_event(radicale_url, calendar, start, start + timedelta(minutes=15), "block")
+        return True
+    return False
 
 
 def _seed(

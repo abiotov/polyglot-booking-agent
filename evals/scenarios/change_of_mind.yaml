@@ -1,0 +1,21 @@
+id: change-of-mind
+description: Accepts a slot, changes mind twice, settles.
+persona:
+  goal: book
+  script_hint: >
+    Tu acceptes d'abord le premier créneau proposé, puis tu changes
+    d'avis et demandes le suivant, puis tu changes encore une fois
+    d'avis et reviens à n'importe lequel des créneaux proposés. Tu
+    t'y tiens ensuite jusqu'à la confirmation.
+  identity: { name: "Rachid Salifou", phone: "+229 91 33 22 11" }
+  client_type: premium
+  visit_type: first_visit
+  languages: [fr]
+calendar_seed:
+  - { day_offset: 0, start: "11:00" }
+expected:
+  outcome: booked
+  identity_exact: true
+  window: premium
+  language_follow: true
+max_turns: 18

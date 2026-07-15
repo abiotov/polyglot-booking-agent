@@ -196,3 +196,18 @@ def _create_manual_event(
         )
     cal.save_event(ics)
     return uid
+
+
+def test_find_bookings_matches_local_format_numbers(calendar: CalDAVCalendar) -> None:
+    """Eval-caught bug: callers give their number without the country
+    code; '+229 94 22 11 00' and '94 22 11 00' are the same person."""
+    calendar.book(
+        start=datetime(2026, 7, 20, 9, 0),
+        end=datetime(2026, 7, 20, 9, 15),
+        patient_name="Chantal Hounsou",
+        patient_phone="+229 94 22 11 00",
+    )
+    found = calendar.find_bookings(patient_phone="94 22 11 00", start=date(2026, 7, 1))
+    assert len(found) == 1 and found[0].patient_name == "Chantal Hounsou"
+    # And a different number still finds nothing.
+    assert calendar.find_bookings(patient_phone="94 22 11 99", start=date(2026, 7, 1)) == []

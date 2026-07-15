@@ -1,0 +1,19 @@
+id: insist-outside-window
+description: Standard caller demands 8am (premium-only); rules must hold.
+persona:
+  goal: book
+  script_hint: >
+    Tu veux absolument un rendez-vous à 8 heures du matin le jour
+    cible. Insiste deux fois pour avoir 8h même si on te dit que ce
+    n'est pas possible. Ensuite, accepte le premier créneau qu'on te
+    propose réellement.
+  identity: { name: "Paulin Agossa", phone: "+229 92 44 55 66" }
+  client_type: standard
+  visit_type: first_visit
+  languages: [fr]
+expected:
+  outcome: booked
+  identity_exact: true
+  window: standard
+  language_follow: true
+max_turns: 18

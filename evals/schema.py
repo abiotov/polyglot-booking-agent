@@ -69,6 +69,10 @@ class Scenario(BaseModel):
     calendar_seed: tuple[SeedEvent, ...] = ()
     expected: Expected
     max_turns: int = Field(default=14, ge=2, le=30)
+    # Mid-call race: once slots have been offered, the runner books a
+    # manual event on the top offered slot behind the agent's back,
+    # exactly like the practitioner acting from their phone.
+    inject_race: bool = False
 
 
 def load_scenarios(directory: str | Path) -> list[Scenario]:

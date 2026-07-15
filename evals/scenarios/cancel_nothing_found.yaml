@@ -1,0 +1,16 @@
+id: cancel-nothing-found
+description: Wants to cancel but nothing exists under their number.
+persona:
+  goal: cancel
+  script_hint: >
+    Tu crois avoir un rendez-vous et tu veux l'annuler, mais tu n'en as
+    en réalité aucun. Quand l'agent ne trouve rien avec ton numéro, tu
+    vérifies le numéro, tu confirmes que c'est le bon, puis tu acceptes
+    la situation et tu termines poliment sans rien réserver.
+  identity: { name: "Sylvie Ahouansou", phone: "+229 93 77 88 99" }
+  client_type: standard
+  visit_type: follow_up
+  languages: [fr]
+expected:
+  outcome: none
+  language_follow: true

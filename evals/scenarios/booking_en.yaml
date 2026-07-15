@@ -1,0 +1,18 @@
+id: booking-en
+description: Pure English caller, premium first visit.
+persona:
+  goal: book
+  script_hint: >
+    Toute la conversation se passe en anglais (tag 'en:'). Tu es direct
+    et efficace. Tu prends le premier créneau proposé.
+  identity: { name: "Grace Miller", phone: "+229 96 55 44 33" }
+  client_type: premium
+  visit_type: first_visit
+  languages: [en]
+calendar_seed:
+  - { day_offset: 0, start: "09:45" }
+expected:
+  outcome: booked
+  identity_exact: true
+  window: premium
+  language_follow: true

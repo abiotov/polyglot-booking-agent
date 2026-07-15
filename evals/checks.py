@@ -15,7 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from calendar_adapter import Booking
+from calendar_adapter import Booking, phones_match
 from scheduling_engine.models import PracticeConfig
 from speech.langdetect import detect_language
 
@@ -114,13 +114,40 @@ def _check_outcome(
                 return CheckResult(name="outcome", passed=False, detail="identity mismatch")
         return CheckResult(name="outcome", passed=passed, detail=detail)
 
-    # "none" and "escalated": the calendar must be untouched.
+    if expected.outcome == "escalated":
+        if created:
+            return CheckResult(
+                name="outcome",
+                passed=False,
+                detail=f"{len(created)} booking(s) created despite full day",
+            )
+        contact = config.client_types[scenario.persona.client_type].escalation_contact
+        if contact and not _contact_mentioned(contact, result):
+            return CheckResult(
+                name="outcome",
+                passed=False,
+                detail=f"escalation contact {contact} never given to the caller",
+            )
+        return CheckResult(name="outcome", passed=True, detail="escalated")
+
+    # "none": the calendar must be untouched.
     passed = not created
     return CheckResult(
         name="outcome",
         passed=passed,
         detail="" if passed else f"{len(created)} unexpected booking(s) created",
     )
+
+
+def _contact_mentioned(contact: str, result: ConversationResult) -> bool:
+    wanted = _normalize_phone(contact)
+    for exchange in result.transcript:
+        if exchange.speaker != "agent":
+            continue
+        digits = "".join(ch for ch in exchange.text if ch.isdigit())
+        if wanted and wanted in digits:
+            return True
+    return False
 
 
 def _split_bookings(
@@ -152,21 +179,13 @@ def _identity_matches(booking: Booking, name: str, phone: str) -> bool:
     same_name = " ".join(booking.patient_name.split()).casefold() == " ".join(
         name.split()
     ).casefold()
-    return same_name and _phones_match(booking.patient_phone, phone)
+    return same_name and phones_match(booking.patient_phone, phone)
 
 
 def _normalize_phone(phone: str) -> str:
     digits = "".join(ch for ch in phone if ch.isdigit())
     # "00229..." and "+229..." are the same number.
     return digits[2:] if digits.startswith("00") else digits
-
-
-def _phones_match(a: str, b: str) -> bool:
-    na, nb = _normalize_phone(a), _normalize_phone(b)
-    if not na or not nb:
-        return False
-    shorter, longer = sorted((na, nb), key=len)
-    return len(shorter) >= 8 and longer.endswith(shorter)
 
 
 def _in_window(booking: Booking, client_type: str, config: PracticeConfig) -> bool:
@@ -178,16 +197,27 @@ def _in_window(booking: Booking, client_type: str, config: PracticeConfig) -> bo
 
 
 def _check_qualify_before_ranking(result: ConversationResult) -> CheckResult:
-    names = [record.name for record in result.tool_trace]
-    if "get_ranked_slots" not in names:
-        return CheckResult(name="qualify-before-ranking", passed=True, detail="no ranking call")
-    first_ranking = names.index("get_ranked_slots")
-    passed = "qualify" in names[:first_ranking]
-    return CheckResult(
-        name="qualify-before-ranking",
-        passed=passed,
-        detail="" if passed else "get_ranked_slots called before any qualify",
-    )
+    """No SUCCESSFUL ranking before qualification.
+
+    A ranking attempt the toolbox refused ("not qualified yet") is the
+    guard doing its job, not a violation: what must never happen is
+    slots actually reaching the model without qualification.
+    """
+    qualified_seen = False
+    for record in result.tool_trace:
+        if record.name == "qualify" and '"ok": true' in record.result:
+            qualified_seen = True
+        elif (
+            record.name == "get_ranked_slots"
+            and "error" not in record.result
+            and not qualified_seen
+        ):
+            return CheckResult(
+                name="qualify-before-ranking",
+                passed=False,
+                detail="slots served before any successful qualify",
+            )
+    return CheckResult(name="qualify-before-ranking", passed=True)
 
 
 def _check_booked_only_offered_slots(result: ConversationResult) -> CheckResult:
@@ -230,6 +260,14 @@ def _check_no_hallucinated_times(result: ConversationResult) -> CheckResult:
         for record in result.tool_trace
         for h, m in _TIME_PATTERN.findall(record.result)
     }
+    # Echoing a time the caller just said ("10h? no, that one is not
+    # available") is conversation, not invention.
+    allowed.update(
+        _canonical(h, m)
+        for exchange in result.transcript
+        if exchange.speaker == "patient"
+        for h, m in _TIME_PATTERN.findall(exchange.text)
+    )
     for exchange in result.transcript:
         if exchange.speaker != "agent":
             continue

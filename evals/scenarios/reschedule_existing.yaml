@@ -1,0 +1,18 @@
+id: reschedule-existing
+description: Move an existing booking to another slot the same day.
+persona:
+  goal: reschedule
+  script_hint: >
+    Tu as un rendez-vous le jour cible à 10:00 pris par téléphone, mais
+    tu as un empêchement. Tu veux le déplacer plus tard le même jour.
+    Tu acceptes le premier nouveau créneau proposé.
+  identity: { name: "Chantal Hounsou", phone: "+229 94 22 11 00" }
+  client_type: standard
+  visit_type: follow_up
+  languages: [fr]
+calendar_seed:
+  - { day_offset: 0, start: "10:00", owner: agent }
+expected:
+  outcome: rescheduled
+  identity_exact: true
+  language_follow: true

@@ -32,7 +32,7 @@ from scheduling_engine.models import BusyInterval
 
 from .errors import EventNotFoundError, NotAgentEventError, SlotTakenError
 
-__all__ = ["AGENT_CATEGORY", "BLOCK_CATEGORY", "Booking", "CalDAVCalendar"]
+__all__ = ["AGENT_CATEGORY", "BLOCK_CATEGORY", "Booking", "CalDAVCalendar", "phones_match"]
 
 AGENT_CATEGORY = "POLYGLOT-AGENT"
 BLOCK_CATEGORY = "BLOCK"
@@ -108,14 +108,13 @@ class CalDAVCalendar:
         first_day = start or datetime.now(tz=self._tz).date()
         range_start = datetime.combine(first_day, time.min, tzinfo=self._tz)
         range_end = range_start + timedelta(days=days)
-        wanted = _normalize_phone(patient_phone) if patient_phone else None
 
         bookings: list[Booking] = []
         for component in self._search_components(range_start, range_end):
             if not self._is_agent_event(component):
                 continue
             phone = str(component.get("X-POLYGLOT-PHONE", ""))
-            if wanted is not None and _normalize_phone(phone) != wanted:
+            if patient_phone is not None and not phones_match(phone, patient_phone):
                 continue
             dtstart, dtend = component.get("DTSTART"), component.get("DTEND")
             if dtstart is None or dtend is None:
@@ -252,8 +251,25 @@ class CalDAVCalendar:
 
 
 def _normalize_phone(phone: str) -> str:
-    """Digits only, so '+229 97 00 00 01' and '0229970000 01' can match."""
-    return "".join(ch for ch in phone if ch.isdigit())
+    """Digits only, with '00' international prefix folded into '+' form."""
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    return digits[2:] if digits.startswith("00") else digits
+
+
+def phones_match(a: str, b: str) -> bool:
+    """Same subscriber, tolerant of formatting and country-code presence.
+
+    Callers give their number as they think of it: '+229 94 22 11 00',
+    '0022994221100' or just '94 22 11 00'. An eval campaign caught the
+    strict-equality version failing to find a booking when the caller
+    used the local format, so the shorter form (at least 8 digits, to
+    avoid trivial matches) must be a suffix of the longer one.
+    """
+    na, nb = _normalize_phone(a), _normalize_phone(b)
+    if not na or not nb:
+        return False
+    shorter, longer = sorted((na, nb), key=len)
+    return len(shorter) >= 8 and longer.endswith(shorter)
 
 
 def _categories(component: Any) -> set[str]:

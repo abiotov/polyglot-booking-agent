@@ -6,7 +6,13 @@ Public API:
     from calendar_adapter.errors import SlotTakenError, NotAgentEventError
 """
 
-from .adapter import AGENT_CATEGORY, BLOCK_CATEGORY, Booking, CalDAVCalendar
+from .adapter import (
+    AGENT_CATEGORY,
+    BLOCK_CATEGORY,
+    Booking,
+    CalDAVCalendar,
+    phones_match,
+)
 from .errors import (
     CalendarError,
     EventNotFoundError,
@@ -23,4 +29,5 @@ __all__ = [
     "EventNotFoundError",
     "NotAgentEventError",
     "SlotTakenError",
+    "phones_match",
 ]

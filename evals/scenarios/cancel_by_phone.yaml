@@ -1,0 +1,17 @@
+id: cancel-by-phone
+description: Cancel an existing booking, located by phone number.
+persona:
+  goal: cancel
+  script_hint: >
+    Tu as un rendez-vous le jour cible à 09:00 pris par téléphone. Tu
+    veux l'annuler. Donne ton numéro quand on te le demande, confirme
+    l'annulation quand l'agent te décrit le rendez-vous trouvé.
+  identity: { name: "Marc Adjovi", phone: "+229 95 12 34 56" }
+  client_type: standard
+  visit_type: follow_up
+  languages: [fr]
+calendar_seed:
+  - { day_offset: 0, start: "09:00", owner: agent }
+expected:
+  outcome: cancelled
+  language_follow: true

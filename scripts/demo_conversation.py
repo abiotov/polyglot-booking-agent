@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from agent import BookingAgent, BookingToolbox, build_system_prompt
 from agent.providers import get_provider
 from calendar_adapter import CalDAVCalendar
+from observability import flush
 from scheduling_engine import load_config
 
 
@@ -63,6 +64,7 @@ def main() -> None:
     print(f"calendar check: {len(booked)} appointment(s) on {monday.isoformat()}")
     for interval in booked:
         print(f"  {interval.start:%H:%M}-{interval.end:%H:%M} ({interval.kind})")
+    flush()
 
 
 if __name__ == "__main__":

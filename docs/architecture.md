@@ -181,6 +181,16 @@ Realtime specifics, each earned from a live session:
 - **Vapi / PSTN** (phase 4): a free US number wired to the same brain;
   Vapi acts as telephony transport only.
 
+### Observability (`src/observability/`) - built
+
+A thin adapter over Opik, enabled only when configured (OPIK_API_KEY or
+OPIK_URL_OVERRIDE), strict no-op otherwise. `traced()` decorates the
+load-bearing functions: `run_turn` (trace root), provider `complete`
+calls (llm spans), toolbox `dispatch` (tool spans), STT/TTS adapters
+and the Telegram channel handlers. The check happens at call time, not
+import time, so entrypoints can load .env in main(). Verdicts never
+come from Opik: it visualizes and compares, deterministic checks judge.
+
 ### Evaluation harness (`evals/`) - planned, phase 5
 
 LLM-simulated patient personas converse with the agent; a structured

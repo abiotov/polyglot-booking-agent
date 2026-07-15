@@ -20,6 +20,7 @@ from typing import Any
 
 from calendar_adapter import CalDAVCalendar, SlotTakenError
 from calendar_adapter.errors import CalendarError
+from observability import traced
 from scheduling_engine import rank_slots
 from scheduling_engine.models import PracticeConfig, ScoredSlot
 
@@ -111,6 +112,7 @@ class BookingToolbox:
 
     # -------------------------------------------------------------- dispatch
 
+    @traced("tool-dispatch", span_type="tool")
     def dispatch(self, name: str, arguments: dict[str, Any]) -> str:
         handlers = {
             "qualify": self._qualify,

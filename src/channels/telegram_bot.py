@@ -31,6 +31,7 @@ from telegram.ext import (
 from agent import BookingAgent, BookingToolbox, build_system_prompt
 from agent.providers import get_provider
 from calendar_adapter import CalDAVCalendar
+from observability import flush
 from scheduling_engine import load_config
 from speech import CartesiaTTS, DeepgramSTT
 
@@ -192,7 +193,10 @@ def main() -> None:
     application.add_error_handler(on_error)
 
     print("Telegram bot running (Ctrl+C to stop)")
-    application.run_polling()
+    try:
+        application.run_polling()
+    finally:
+        flush()
 
 
 def _require(key: str) -> str:

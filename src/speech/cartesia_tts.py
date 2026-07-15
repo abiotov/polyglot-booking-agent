@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import httpx
 
+from observability import traced
+
 from .types import AudioClip
 
 _ENDPOINT = "https://api.cartesia.ai/tts/bytes"
@@ -46,6 +48,7 @@ class CartesiaTTS:
             timeout=timeout,
         )
 
+    @traced("cartesia-tts", span_type="tool")
     def synthesize(self, text: str, language: str) -> AudioClip:
         lang = language if language in self._voices else self._fallback_language
         response = self._client.post(

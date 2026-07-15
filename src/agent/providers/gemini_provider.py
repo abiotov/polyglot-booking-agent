@@ -10,6 +10,7 @@ from google import genai
 from google.genai import types as gtypes
 
 from agent.types import ChatMessage, ProviderReply, ToolCall, ToolSpec
+from observability import traced
 
 
 class GeminiProvider:
@@ -21,6 +22,7 @@ class GeminiProvider:
     def name(self) -> str:
         return f"gemini:{self._model}"
 
+    @traced("gemini-complete", span_type="llm")
     def complete(
         self,
         system: str,

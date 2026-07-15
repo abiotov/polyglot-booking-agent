@@ -13,6 +13,7 @@ import argparse
 from dotenv import load_dotenv
 
 from calendar_adapter import CalDAVCalendar
+from observability import flush
 from scheduling_engine import load_config
 
 from .loop import BookingAgent
@@ -46,14 +47,17 @@ def main() -> None:
     )
 
     print(f"[{provider.name}] {config.practice.name} reception. Type 'quit' to exit.")
-    while True:
-        try:
-            user_text = input("You:   ").strip()
-        except (EOFError, KeyboardInterrupt):
-            break
-        if not user_text or user_text.lower() in {"quit", "exit"}:
-            break
-        print(f"Agent: {agent.run_turn(user_text)}")
+    try:
+        while True:
+            try:
+                user_text = input("You:   ").strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if not user_text or user_text.lower() in {"quit", "exit"}:
+                break
+            print(f"Agent: {agent.run_turn(user_text)}")
+    finally:
+        flush()
 
 
 if __name__ == "__main__":

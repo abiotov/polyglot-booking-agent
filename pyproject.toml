@@ -35,6 +35,7 @@ dependencies = [
     "httpx>=0.27",
     "python-telegram-bot>=21.0",
     "livekit-agents[cartesia,deepgram,openai,silero]>=1.0",
+    "opik>=2.1.30",
 ]
 
 [project.optional-dependencies]
@@ -52,7 +53,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/scheduling_engine", "src/calendar_adapter", "src/agent", "src/speech", "src/channels"]
+packages = ["src/scheduling_engine", "src/calendar_adapter", "src/agent", "src/speech", "src/channels", "src/observability"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -71,11 +72,11 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
 strict = true
-packages = ["scheduling_engine", "calendar_adapter", "agent", "speech", "channels"]
+packages = ["scheduling_engine", "calendar_adapter", "agent", "speech", "channels", "observability"]
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["caldav.*", "icalendar.*", "radicale.*"]
+module = ["caldav.*", "icalendar.*", "radicale.*", "opik.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

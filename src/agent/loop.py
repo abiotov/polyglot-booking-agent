@@ -12,6 +12,8 @@ from collections.abc import Iterator
 from datetime import date
 from typing import NamedTuple
 
+from observability import traced
+
 from .providers.base import LLMProvider
 from .tools import BookingToolbox
 from .types import ChatMessage
@@ -48,6 +50,7 @@ class BookingAgent:
         self._max_tool_rounds = max_tool_rounds
         self.history: list[ChatMessage] = []
 
+    @traced("conversation-turn")
     def run_turn(
         self,
         user_text: str,

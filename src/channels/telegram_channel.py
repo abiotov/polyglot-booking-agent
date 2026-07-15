@@ -23,6 +23,7 @@ from collections.abc import Callable
 from pydantic import BaseModel, ConfigDict
 
 from agent import BookingAgent
+from observability import traced
 from speech.types import AudioClip, STTProvider, TTSProvider
 
 logger = logging.getLogger("channels.telegram")
@@ -54,6 +55,7 @@ class TelegramChannel:
         self._tts = tts
         self._sessions: dict[int, BookingAgent] = {}
 
+    @traced("telegram-text")
     def handle_text(self, chat_id: int, text: str) -> ChannelReply:
         """Typed message in, typed reply out."""
         agent = self._session(chat_id)
@@ -65,6 +67,7 @@ class TelegramChannel:
         )
         return ChannelReply(text=reply_text)
 
+    @traced("telegram-voice")
     def handle_voice(self, chat_id: int, audio: bytes, mime_type: str) -> ChannelReply:
         """Voice note in, voice note out (plus transcript text)."""
         t0 = time.perf_counter()

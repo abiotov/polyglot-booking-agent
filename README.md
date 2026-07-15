@@ -156,6 +156,20 @@ uv run python scripts/demo_conversation.py        # replay a full booking,
 - [ ] **Phase 4: phone.** Free Vapi number wired to the same brain, end-to-end call demo
 - [ ] **Phase 5: proof.** Agent-vs-agent eval harness (simulated patients + structured judge), per-language success metrics in CI, slot-scoring visualizer
 
+## Observability (optional)
+
+Every conversation can be traced to [Opik](https://github.com/comet-ml/opik)
+(open source, Apache 2.0): one trace per turn, with nested spans for
+each LLM round, tool call, transcription and synthesis, their inputs,
+outputs and latencies. Eval campaigns (phase 5) log as experiments for
+side-by-side comparison across prompts and providers.
+
+Set `OPIK_API_KEY` + `OPIK_WORKSPACE` in `.env` (Comet cloud free tier)
+or `OPIK_URL_OVERRIDE` (self-hosted). Without them, observability is a
+strict no-op: no import, no network, tests and CI stay hermetic. Opik
+is used for seeing and comparing only; pass/fail verdicts stay with the
+deterministic checks (see design decision 8).
+
 ## Design decisions
 
 Longer write-ups live in [docs/design-decisions.md](docs/design-decisions.md). The short version:

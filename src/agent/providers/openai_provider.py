@@ -9,6 +9,7 @@ from typing import Any
 from openai import OpenAI
 
 from agent.types import ChatMessage, ProviderReply, ToolCall, ToolSpec
+from observability import traced
 
 
 class OpenAIProvider:
@@ -20,6 +21,7 @@ class OpenAIProvider:
     def name(self) -> str:
         return f"openai:{self._model}"
 
+    @traced("openai-complete", span_type="llm")
     def complete(
         self,
         system: str,

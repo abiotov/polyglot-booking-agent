@@ -29,6 +29,8 @@ from typing import Any
 
 import httpx
 
+from observability import traced
+
 from .langdetect import mostly_latin
 from .types import Utterance
 
@@ -60,6 +62,7 @@ class DeepgramSTT:
             timeout=timeout,
         )
 
+    @traced("deepgram-stt", span_type="tool")
     def transcribe(self, audio: bytes, mime_type: str) -> Utterance:
         text, language = self._multilingual_request(audio, mime_type)
         if not text.strip() or not mostly_latin(text):

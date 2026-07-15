@@ -18,6 +18,7 @@ from calendar_adapter.devserver import make_dev_server
 from observability import flush
 from scheduling_engine import load_config
 
+from .checks import run_checks
 from .runner import run_scenario
 from .schema import load_scenarios
 
@@ -49,6 +50,7 @@ def main() -> None:
     thread.start()
     url = f"http://127.0.0.1:{server.server_port}"
 
+    failures = 0
     try:
         for scenario in scenarios:
             print(f"\n=== {scenario.id} ({args.provider}) ===")
@@ -58,15 +60,23 @@ def main() -> None:
                 print(f"  {exchange.speaker:>7}{tag}: {exchange.text}")
             print(f"  -- ended: {result.ended_reason} after {result.turns} turns")
             print(f"  -- tools: {[record.name for record in result.tool_trace]}")
-            bookings = [
-                (b.start.isoformat(timespec="minutes"), b.patient_name, b.patient_phone)
-                for b in result.final_bookings
-            ]
-            print(f"  -- bookings: {bookings}")
+
+            checks = run_checks(scenario, result, config)
+            scenario_passed = all(check.passed for check in checks)
+            failures += 0 if scenario_passed else 1
+            for check in checks:
+                mark = "PASS" if check.passed else "FAIL"
+                detail = f"  ({check.detail})" if check.detail else ""
+                print(f"  [{mark}] {check.name}{detail}")
+            print(f"  ==> {'PASS' if scenario_passed else 'FAIL'}")
     finally:
         flush()
         server.shutdown()
         thread.join(timeout=5)
+
+    print(f"\ncampaign: {len(scenarios) - failures}/{len(scenarios)} scenarios passed")
+    if failures:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

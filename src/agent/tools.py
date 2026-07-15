@@ -79,6 +79,17 @@ class BookingToolbox:
                 ),
             ),
             ToolSpec(
+                name="find_bookings",
+                description=(
+                    "List the caller's upcoming appointments by their phone "
+                    "number. Use it when they ask what appointments they "
+                    "have, or before cancelling or moving one."
+                ),
+                parameters=_strict_object(
+                    patient_phone={"type": "string"},
+                ),
+            ),
+            ToolSpec(
                 name="reschedule",
                 description=(
                     "Move an existing agent-created booking to a new slot "
@@ -105,6 +116,7 @@ class BookingToolbox:
             "qualify": self._qualify,
             "get_ranked_slots": self._get_ranked_slots,
             "book": self._book,
+            "find_bookings": self._find_bookings,
             "reschedule": self._reschedule,
             "cancel": self._cancel,
         }
@@ -164,12 +176,23 @@ class BookingToolbox:
                 "slot_id was not part of the last get_ranked_slots result; "
                 "call get_ranked_slots again and offer only returned slots"
             )
+        # Presence in the schema is not enough: a booking with a blank
+        # identity is unusable for the practice (observed live).
+        name = str(args["patient_name"]).strip()
+        phone = str(args["patient_phone"]).strip()
+        if len(name) < 2:
+            return _error("patient_name is empty; collect and confirm the caller's name first")
+        if sum(ch.isdigit() for ch in phone) < 6:
+            return _error(
+                "patient_phone is missing or too short; collect and confirm "
+                "the caller's phone number first"
+            )
         try:
             booking = self._calendar.book(
                 start=slot.start,
                 end=slot.end,
-                patient_name=str(args["patient_name"]),
-                patient_phone=str(args["patient_phone"]),
+                patient_name=name,
+                patient_phone=phone,
             )
         except SlotTakenError:
             self._offered.pop(slot.slot_id, None)
@@ -183,6 +206,24 @@ class BookingToolbox:
                 "booking_uid": booking.uid,
                 "start": booking.start.isoformat(timespec="minutes"),
                 "patient_name": booking.patient_name,
+            }
+        )
+
+    def _find_bookings(self, args: dict[str, Any]) -> str:
+        phone = str(args["patient_phone"]).strip()
+        if sum(ch.isdigit() for ch in phone) < 6:
+            return _error("patient_phone is missing or too short; ask the caller for it")
+        bookings = self._calendar.find_bookings(patient_phone=phone)
+        return json.dumps(
+            {
+                "bookings": [
+                    {
+                        "booking_uid": b.uid,
+                        "start": b.start.strftime("%A %d %B %H:%M"),
+                        "patient_name": b.patient_name,
+                    }
+                    for b in bookings
+                ]
             }
         )
 

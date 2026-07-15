@@ -193,6 +193,57 @@ def test_unknown_qualification_values_are_rejected(
     assert "error" in result
 
 
+def test_blank_identity_is_refused(
+    calendar: CalDAVCalendar, config: PracticeConfig
+) -> None:
+    """A booking with an empty name or junk phone must never reach the calendar."""
+    toolbox = BookingToolbox(calendar, config)
+    toolbox.dispatch("qualify", {"client_type": "premium", "visit_type": "first_visit"})
+    offered = json.loads(toolbox.dispatch("get_ranked_slots", {"day": "2026-07-20"}))
+    slot_id = offered["slots"][0]["slot_id"]
+
+    for name, phone in [("", "+22997000001"), ("  ", "+22997000001"), ("Jean", "abc")]:
+        result = json.loads(
+            toolbox.dispatch(
+                "book", {"slot_id": slot_id, "patient_name": name, "patient_phone": phone}
+            )
+        )
+        assert "error" in result
+    assert calendar.busy_intervals(MONDAY) == []
+
+
+def test_find_bookings_by_phone_closes_the_loop(
+    calendar: CalDAVCalendar, config: PracticeConfig
+) -> None:
+    """Check -> cancel without the caller ever knowing a uid upfront."""
+    toolbox = BookingToolbox(calendar, config)
+    toolbox.dispatch("qualify", {"client_type": "premium", "visit_type": "first_visit"})
+    offered = json.loads(toolbox.dispatch("get_ranked_slots", {"day": "2026-07-20"}))
+    toolbox.dispatch(
+        "book",
+        {
+            "slot_id": offered["slots"][0]["slot_id"],
+            "patient_name": "Jean Kokou",
+            "patient_phone": "+229 97 00 00 01",
+        },
+    )
+
+    # Different formatting of the same number still matches.
+    found = json.loads(toolbox.dispatch("find_bookings", {"patient_phone": "22997000001"}))
+    assert len(found["bookings"]) == 1
+    assert found["bookings"][0]["patient_name"] == "Jean Kokou"
+
+    # A stranger's number finds nothing.
+    other = json.loads(toolbox.dispatch("find_bookings", {"patient_phone": "+22990009999"}))
+    assert other["bookings"] == []
+
+    # The found uid is enough to cancel.
+    uid = found["bookings"][0]["booking_uid"]
+    cancelled = json.loads(toolbox.dispatch("cancel", {"booking_uid": uid}))
+    assert cancelled == {"cancelled": True}
+    assert calendar.busy_intervals(MONDAY) == []
+
+
 def test_language_tag_from_the_channel_is_prepended(
     calendar: CalDAVCalendar, config: PracticeConfig
 ) -> None:

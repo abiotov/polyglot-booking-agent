@@ -91,6 +91,46 @@ class CalDAVCalendar:
                 intervals.append(interval)
         return sorted(intervals, key=lambda i: i.start)
 
+    def find_bookings(
+        self,
+        patient_phone: str | None = None,
+        start: date | None = None,
+        days: int = 60,
+    ) -> list[Booking]:
+        """Agent-created bookings in [start, start+days), optionally by phone.
+
+        This is how a caller retrieves their own appointments (to check,
+        cancel or move them) without ever seeing internal uids leak into
+        the conversation protocol: the agent looks them up by the phone
+        number the caller gives. Manual practitioner events are never
+        returned.
+        """
+        first_day = start or datetime.now(tz=self._tz).date()
+        range_start = datetime.combine(first_day, time.min, tzinfo=self._tz)
+        range_end = range_start + timedelta(days=days)
+        wanted = _normalize_phone(patient_phone) if patient_phone else None
+
+        bookings: list[Booking] = []
+        for component in self._search_components(range_start, range_end):
+            if not self._is_agent_event(component):
+                continue
+            phone = str(component.get("X-POLYGLOT-PHONE", ""))
+            if wanted is not None and _normalize_phone(phone) != wanted:
+                continue
+            dtstart, dtend = component.get("DTSTART"), component.get("DTEND")
+            if dtstart is None or dtend is None:
+                continue
+            bookings.append(
+                Booking(
+                    uid=str(component.get("UID", "")),
+                    start=self._to_local(dtstart.dt),
+                    end=self._to_local(dtend.dt),
+                    patient_name=str(component.get("SUMMARY", "")),
+                    patient_phone=phone,
+                )
+            )
+        return sorted(bookings, key=lambda b: b.start)
+
     # ----------------------------------------------------------------- writes
 
     def book(
@@ -209,6 +249,11 @@ class CalDAVCalendar:
         calendar.add("version", "2.0")
         calendar.add_component(event)
         return calendar.to_ical().decode()
+
+
+def _normalize_phone(phone: str) -> str:
+    """Digits only, so '+229 97 00 00 01' and '0229970000 01' can match."""
+    return "".join(ch for ch in phone if ch.isdigit())
 
 
 def _categories(component: Any) -> set[str]:

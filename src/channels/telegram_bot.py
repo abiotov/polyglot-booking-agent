@@ -18,6 +18,7 @@ from typing import TypeVar
 from dotenv import load_dotenv
 from telegram import Chat, Update
 from telegram.constants import ChatAction
+from telegram.error import Conflict as TelegramConflict
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -154,10 +155,24 @@ def main() -> None:
         else:
             await message.reply_text(reply.text)
 
+    async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        error = context.error
+        if isinstance(error, TelegramConflict):
+            # 33 stack traces for one root cause helps nobody.
+            logging.getLogger("channels.telegram").error(
+                "another instance of this bot is polling with the same token; "
+                "stop it (only one instance may run)"
+            )
+            return
+        logging.getLogger("channels.telegram").exception(
+            "unhandled error while processing an update", exc_info=error
+        )
+
     application = Application.builder().token(_require("TELEGRAM_BOT_TOKEN")).build()
     application.add_handler(CommandHandler("start", on_start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     application.add_handler(MessageHandler(filters.VOICE, on_voice))
+    application.add_error_handler(on_error)
 
     print("Telegram bot running (Ctrl+C to stop)")
     application.run_polling()

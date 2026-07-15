@@ -1,0 +1,19 @@
+id: booking-switcher
+description: Starts in French, switches to English once slots are offered.
+persona:
+  goal: book
+  script_hint: >
+    Tu commences la conversation en français. À partir du moment où on
+    te propose des créneaux, tu passes à l'anglais et tu y restes
+    jusqu'à la fin (tag 'en:'). Tu choisis le premier créneau proposé.
+  identity: { name: "Jean Kokou", phone: "+229 97 00 00 01" }
+  client_type: standard
+  visit_type: follow_up
+  languages: [fr, en]
+calendar_seed:
+  - { day_offset: 0, start: "10:00" }
+expected:
+  outcome: booked
+  identity_exact: true
+  window: standard
+  language_follow: true

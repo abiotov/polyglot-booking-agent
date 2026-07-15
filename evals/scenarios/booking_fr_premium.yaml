@@ -1,0 +1,19 @@
+id: booking-fr-premium
+description: Happy path in French, premium first visit, cooperative caller.
+persona:
+  goal: book
+  script_hint: >
+    Tu veux un rendez-vous le matin du jour cible. Tu es coopératif et
+    poli. Tu réponds aux questions une par une. Tout se passe en français.
+  identity: { name: "Awa Dossou", phone: "+229 97 11 22 33" }
+  client_type: premium
+  visit_type: first_visit
+  languages: [fr]
+calendar_seed:
+  - { day_offset: 0, start: "08:30" }
+  - { day_offset: 0, start: "12:00", end: "13:00", kind: block }
+expected:
+  outcome: booked
+  identity_exact: true
+  window: premium
+  language_follow: true

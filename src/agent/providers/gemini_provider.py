@@ -29,17 +29,19 @@ class GeminiProvider:
         history: Sequence[ChatMessage],
         tools: Sequence[ToolSpec],
     ) -> ProviderReply:
+        # list[Any]: the SDK's tools union defeats list invariance
+        gemini_tools: list[Any] | None = (
+            [gtypes.Tool(function_declarations=[self._to_declaration(t) for t in tools])]
+            if tools  # an empty declaration list is rejected
+            else None
+        )
         response = self._client.models.generate_content(
             model=self._model,
             # cast: the SDK's ContentListUnion defeats list invariance
             contents=cast(Any, self._to_contents(history)),
             config=gtypes.GenerateContentConfig(
                 system_instruction=system,
-                tools=[
-                    gtypes.Tool(
-                        function_declarations=[self._to_declaration(t) for t in tools]
-                    )
-                ],
+                tools=gemini_tools,
                 automatic_function_calling=gtypes.AutomaticFunctionCallingConfig(
                     disable=True
                 ),

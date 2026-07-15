@@ -28,10 +28,13 @@ class OpenAIProvider:
         history: Sequence[ChatMessage],
         tools: Sequence[ToolSpec],
     ) -> ProviderReply:
+        kwargs: dict[str, Any] = {}
+        if tools:  # the API rejects an empty tools array
+            kwargs["tools"] = [self._to_tool(t) for t in tools]
         response = self._client.chat.completions.create(
             model=self._model,
             messages=self._to_messages(system, history),
-            tools=[self._to_tool(t) for t in tools],
+            **kwargs,
         )
         message = response.choices[0].message
         calls = tuple(

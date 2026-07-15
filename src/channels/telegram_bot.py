@@ -77,7 +77,10 @@ def build_channel(
     }
     return TelegramChannel(
         agent_factory=agent_factory,
-        stt=DeepgramSTT(api_key=_require("DEEPGRAM_API_KEY")),
+        stt=DeepgramSTT(
+            api_key=_require("DEEPGRAM_API_KEY"),
+            languages=config.practice.languages,
+        ),
         tts=CartesiaTTS(api_key=_require("CARTESIA_API_KEY"), voices=voices),
     )
 

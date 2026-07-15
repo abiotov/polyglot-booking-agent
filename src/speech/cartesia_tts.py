@@ -33,21 +33,23 @@ class CartesiaTTS:
         """`voices` maps a language tag to a Cartesia voice id."""
         if fallback_language not in voices:
             raise ValueError(f"voices must include the fallback language {fallback_language!r}")
-        self._api_key = api_key
         self._voices = voices
         self._model = model
         self._fallback_language = fallback_language
-        self._timeout = timeout
-
-    def synthesize(self, text: str, language: str) -> AudioClip:
-        lang = language if language in self._voices else self._fallback_language
-        response = httpx.post(
-            _ENDPOINT,
+        # Persistent client: connection reuse matters on slow uplinks.
+        self._client = httpx.Client(
             headers={
-                "X-API-Key": self._api_key,
+                "X-API-Key": api_key,
                 "Cartesia-Version": _VERSION,
                 "Content-Type": "application/json",
             },
+            timeout=timeout,
+        )
+
+    def synthesize(self, text: str, language: str) -> AudioClip:
+        lang = language if language in self._voices else self._fallback_language
+        response = self._client.post(
+            _ENDPOINT,
             json={
                 "model_id": self._model,
                 "transcript": text,
@@ -59,7 +61,6 @@ class CartesiaTTS:
                     "sample_rate": 44100,
                 },
             },
-            timeout=self._timeout,
         )
         response.raise_for_status()
         return AudioClip(data=response.content, mime_type="audio/mpeg")

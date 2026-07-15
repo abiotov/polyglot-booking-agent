@@ -5,11 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 
-A multilingual voice AI agent that books, reschedules and cancels appointments for a practice (medical office, dental clinic, salon, garage), reachable over **phone, browser (WebRTC) and Telegram**, speaking **French and English with mid-conversation language switching**.
+A multilingual voice AI agent that books, reschedules and cancels appointments for a practice (medical office, dental clinic, salon, garage), reachable over the **browser (WebRTC realtime voice), Telegram (mixed text and voice notes) and the terminal**, speaking **French and English with mid-conversation language switching**. A PSTN phone channel (Twilio SIP) is the next perspective.
 
 The core idea: **the LLM converses, it never decides.** Slot selection is a deterministic, testable, explainable scheduling engine. The practice calendar (any CalDAV server: iCloud, Google, Radicale) remains the single source of truth.
 
-> Status: under active development. Phase 1 (scheduling engine + calendar adapter + text agent) in progress. See the [roadmap](#roadmap).
+> Status: core complete. Engine, calendar adapter, three conversation channels, observability and the eval harness are built, tested and hardened against live sessions; see the [roadmap](#roadmap) and the [evaluation numbers](#evaluation).
 
 ## Why this project
 
@@ -24,9 +24,9 @@ Voice booking agents usually fail in one of two ways: the LLM hallucinates avail
 ```mermaid
 flowchart LR
     subgraph Channels
-        P[Phone / PSTN]
         W[Browser / WebRTC]
         T[Telegram voice notes]
+        P[Phone / PSTN - planned]
     end
 
     subgraph Brain
@@ -70,7 +70,7 @@ Every score is returned decomposed (for example `{"adjacent_before": 10, "premiu
 
 ## Language switching
 
-Speech-to-text (Deepgram nova-3) tags every utterance with its detected language. The agent replies in the language of the last user message, and the orchestrator picks the matching TTS voice (French or English). A caller can start in French and finish in English without missing a beat. Adding a language is configuration: one STT language code, one voice, one prompt translation.
+Every caller utterance gets a detected language (Deepgram's multilingual mode on voice notes, transcript-based marker scoring in realtime), and the channel prepends an authoritative `[lang=xx]` tag to the turn: deterministic tagging, because live tests showed models ignoring a mid-call switch when it was prompt-only. The reply is voiced with the matching TTS voice, same voice persona across languages. A caller can start in French and finish in English without missing a beat; adding a language is configuration plus one prompt translation.
 
 ## Tech stack
 
@@ -90,13 +90,15 @@ Every provider sits behind a small interface. Swapping means changing an environ
 
 ```text
 ├── src/
-│   ├── scheduling_engine/   # pure domain logic: constraints, scoring, config
-│   ├── calendar_adapter/    # CalDAV I/O, read-before-write, dev server
-│   └── agent/               # LLM loop, strict tools, providers, prompts, CLI
-├── channels/                # telegram, livekit (console + browser)
-├── evals/                   # simulated patients + LLM judge    (phase 5)
-├── scripts/                 # run_radicale.py, seed_calendar.py
-├── config/                  # practice.example.yaml
+│   ├── scheduling_engine/   # pure domain logic: constraints, compaction scoring
+│   ├── calendar_adapter/    # CalDAV I/O, read-before-write, in-process dev server
+│   ├── agent/               # LLM loop, strict tools, swappable providers, CLI
+│   ├── speech/              # Deepgram STT, Cartesia TTS, language detection
+│   ├── channels/            # Telegram bot, LiveKit realtime (console + browser)
+│   └── observability/       # optional Opik tracing, strict no-op unconfigured
+├── evals/                   # agent-vs-agent harness: scenarios, checks, judge
+├── scripts/                 # radicale server, seeding, demos, browser calls
+├── config/                  # practice.example.yaml (all business rules)
 ├── docs/                    # architecture and design decisions
 └── tests/                   # unit, property-based and live-CalDAV integration
 ```
@@ -158,15 +160,18 @@ uv run python scripts/browser_call.py             # prints a browser link
 ## Roadmap
 
 - [x] Repository bootstrap, CI, docs
-- [x] **Phase 1: the brain.**
-  - [x] Scheduling engine: constraints + compaction scoring, unit and property-based tests
-  - [x] CalDAV adapter: read-before-write, agent-owned events, live-Radicale integration tests
-  - [x] Text-mode agent: strict tools, OpenAI/Gemini adapters, FR/EN with mid-call switching
-- [x] **Phase 2: Telegram.** Mixed text and voice in one conversation, voice notes in and out (Deepgram nova-3 multilingual + Cartesia sonic-3, one voice across languages), per-chat sessions, find/cancel/reschedule by phone number, all hardened against real sessions (see [docs/design-decisions.md](docs/design-decisions.md))
-- [x] **Phase 3: realtime.** LiveKit pipeline (same brain via `llm_node`), local console voice mode, barge-in, live language switching, spoken filler during tool rounds; full voice booking with digit-by-digit phone correction validated live (2.1-4.8s per turn)
-- [ ] **Phase 4: phone.** A PSTN number (Twilio SIP) wired to the same brain, end-to-end call demo
-- [x] **Phase 5: proof.** Agent-vs-agent eval harness: 12 scenarios (races, garbled identities, escalations), deterministic verdicts + advisory LLM judge, campaign report, Opik traces with feedback scores, weekly/dispatch CI workflow. Current campaign: 12/12
-- [ ] Slot-scoring visualizer
+- [x] **The brain.** Scheduling engine (constraints + compaction scoring, unit and property-based tests), CalDAV adapter (read-before-write, agent-owned events, live-Radicale integration tests), text-mode agent (strict tools, OpenAI/Gemini adapters, FR/EN with mid-call switching)
+- [x] **Telegram.** Mixed text and voice in one conversation, voice notes in and out (Deepgram nova-3 multilingual + Cartesia sonic-3, one voice across languages), per-chat sessions, find/cancel/reschedule by phone number, hardened against real sessions (see [docs/design-decisions.md](docs/design-decisions.md))
+- [x] **Realtime.** LiveKit pipeline (same brain via `llm_node`), local console mode and self-hosted browser calls, barge-in, live language switching, spoken filler during tool rounds; full voice booking validated live (2.1-4.8s per turn)
+- [x] **Proof.** Agent-vs-agent eval harness: 12 scenarios (mid-call races, garbled identities, escalations), deterministic verdicts + advisory LLM judge, campaign reports, Opik traces with feedback scores, weekly/dispatch CI workflow. Campaigns: 11-12/12
+- [x] **Observability.** Optional Opik tracing across every channel, no-op without configuration
+
+### Perspectives
+
+- [ ] **PSTN telephony**: a phone number (Twilio SIP trunk) wired to the same brain, callable from any phone
+- [ ] Slot-scoring visualizer (the ranking grid, scores explained on hover)
+- [ ] Provider comparison campaigns (`--provider gemini`) published side by side
+- [ ] Token-level streaming from the brain to TTS (~1-2s latency gain in realtime)
 
 ## Evaluation
 
@@ -231,6 +236,8 @@ Longer write-ups live in [docs/design-decisions.md](docs/design-decisions.md). T
 - **Why CalDAV instead of a database:** zero migration for the practice, free local development (Radicale), and manual edits stay authoritative.
 - **Why read-before-write:** the practitioner can take a slot from their phone while a caller is on the line. The agent re-checks and gracefully re-offers.
 - **Why provider adapters everywhere:** no vendor lock-in, and the project stays demoable at zero infrastructure cost.
+- **Why dates are resolved by the harness, not the model:** a live session showed "next Wednesday" resolved to a weekend and relayed as "no availability"; the prompt now carries a deterministic date reference and every tool answer echoes the day it is about.
+- **Why real sessions and eval campaigns are the test suite:** every failure observed live became a code-level guard; see decisions 8 and 9.
 
 ## License
 

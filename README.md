@@ -5,6 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 
+> 🇫🇷 [Version française](README.fr.md)
+
 A multilingual voice AI agent that books, reschedules and cancels appointments for a practice (medical office, dental clinic, salon, garage), reachable over the **browser (WebRTC realtime voice), Telegram (mixed text and voice notes) and the terminal**, speaking **French and English with mid-conversation language switching**. A PSTN phone channel (Twilio SIP) is the next perspective.
 
 The core idea: **the LLM converses, it never decides.** Slot selection is a deterministic, testable, explainable scheduling engine. The practice calendar (any CalDAV server: iCloud, Google, Radicale) remains the single source of truth.

@@ -1,5 +1,7 @@
 # Architecture
 
+🇫🇷 [Version française](architecture.fr.md)
+
 > Living document. Updated at the end of each phase; sections for
 > components that are not built yet are marked as planned.
 

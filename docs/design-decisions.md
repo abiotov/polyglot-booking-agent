@@ -1,5 +1,7 @@
 # Design decisions
 
+🇫🇷 [Version française](design-decisions.fr.md)
+
 > The reasoning behind the choices that shape this project. Each entry
 > states the decision, the alternatives considered, and why.
 
